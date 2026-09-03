@@ -9,17 +9,15 @@ Snowflake Japan が提供する、日本向けのサンプルコード・デモ�
 > **Disclaimer: This demo is not an official Snowflake product.**
 >
 > **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**.
-> It is **not intended for production use**. No warranty is provided, and Snowflake is not responsible for any issues arising from the use of this code in production environments. Always review and test thoroughly before using in any production system.
 >
 > **[JA]** このリポジトリ内のすべてのコード・コンテンツは、**デモおよび学習目的のみ** を意図して提供されています。
-> **本番環境での使用を想定したものではありません。** いかなる保証も提供されず、本コードを本番環境で使用したことによって生じた問題について Snowflake は責任を負いません。本番環境で利用する際は、必ず十分なレビューとテストを行ってください。
 
 ---
 
 ## 目的
 
 このリポジトリは、Snowflake の機能をわかりやすく伝えるための日本語コンテンツを集約・管理することを目的としています。  
-Sales Engineer が作成したデモスクリプト、イベント資材、ハンズオンコンテンツなどを収録しています。
+デモスクリプト、イベント資材、ハンズオンコンテンツなどを収録しています。
 
 ---
 
@@ -42,7 +40,6 @@ sf-samples-jp/
 
 - `use-cases/` — 業種別ユースケースサンプル
 - `templates/` — 汎用 SQL テンプレート集
-- `quickstarts/` — 機能別クイックスタートガイド
 
 ---
 

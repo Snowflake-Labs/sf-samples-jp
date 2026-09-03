@@ -2,7 +2,7 @@
 
 > **Disclaimer: This demo is not an official Snowflake product.**
 >
-> このコンテンツはデモ目的のみで提供されており、本番環境での使用を想定していません。
+> このコンテンツはデモ目的として提供されています。
 
 ---
 
@@ -31,7 +31,7 @@
 ### 使用する Snowflake 機能
 
 - [例: Cortex Analyst]
-- [例: Snowpark Python]
+- [例: Snowpark]
 - [例: Streamlit in Snowflake]
 
 ---
@@ -41,11 +41,11 @@
 ```
 demo/[デモフォルダ名]/
 ├── README.md           # このファイル
-├── setup.sql           # 初期セットアップ用 SQL
-├── main.sql            # メインのデモ SQL
-├── app.py              # Streamlit アプリ（該当する場合）
-├── requirements.txt    # Python パッケージ（該当する場合）
-└── teardown.sql        # クリーンアップ用 SQL
+├── setup.sql           # (もしあれば) 初期セットアップ用 SQL ()
+├── main.sql            # (もしあれば) メインのデモ SQL
+├── app.py              # (もしあれば) Streamlit アプリ
+├── requirements.txt    # (もしあれば) Python パッケージ
+└── teardown.sql        # (もしあれば) クリーンアップ用 SQL
 ```
 
 ---
@@ -77,7 +77,7 @@ demo/[デモフォルダ名]/
 
 ## クリーンアップ / Cleanup
 
-デモ終了後、以下のSQLで作成したリソースを削除できます。
+以下のSQLで作成したリソースを削除できます。
 
 ```sql
 -- teardown.sql を実行
