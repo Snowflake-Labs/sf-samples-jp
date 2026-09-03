@@ -1,0 +1,35 @@
+# demo/
+
+商談・POC向けのデモスクリプト・Streamlit アプリ・Notebook などを管理するフォルダです。
+
+---
+
+## ルール
+
+- **各デモは必ず独立したサブフォルダを作成してください。**
+- **各サブフォルダに `README.md` を必ず配置してください。**  
+  テンプレートは [`README_TEMPLATE.md`](./README_TEMPLATE.md) を使用してください。
+
+## フォルダ命名規則
+
+```
+YYYYMM_デモ名/
+```
+
+例:
+```
+demo/
+├── 202501_cortex-analyst-text-to-sql/
+│   ├── README.md
+│   └── ...
+└── 202502_streamlit-data-app/
+    ├── README.md
+    └── ...
+```
+
+## 新しいデモを追加するには
+
+1. `YYYYMM_デモ名/` の形式でサブフォルダを作成する
+2. `README_TEMPLATE.md` をコピーして `README.md` として配置する
+3. 必要なファイル（SQL・Python・Notebook など）を追加する
+4. PR を作成する（[CONTRIBUTING.md](../CONTRIBUTING.md) 参照）
