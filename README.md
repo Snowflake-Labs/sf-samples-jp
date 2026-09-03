@@ -6,6 +6,8 @@ Snowflake Japan が提供する、日本向けのサンプルコード・デモ�
 
 > **Disclaimer / 免責事項**
 >
+> **Disclaimer: This demo is not an official Snowflake product.**
+>
 > **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**.
 > It is **not intended for production use**. No warranty is provided, and Snowflake is not responsible for any issues arising from the use of this code in production environments. Always review and test thoroughly before using in any production system.
 >
