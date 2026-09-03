@@ -26,10 +26,7 @@
 
 ## ファイル命名規則
 
-- SQL スクリプト: `YYYYMM_説明.sql`（例: `202501_cortex_analyst_demo.sql`）
-- Python スクリプト: `YYYYMM_説明.py`
-- Notebook: `YYYYMM_説明.ipynb`
-- イベントサブフォルダ: `YYYYMM_イベント名/`（例: `202501_snowday-japan/`）
+- イベントサブフォルダ: `YYYYMM_イベント名/`（例: `202602_discover-japan/`）
 
 ---
 
