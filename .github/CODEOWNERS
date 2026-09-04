@@ -1,0 +1,5 @@
+# CODEOWNERS
+# このファイルのオーナーはすべてのファイルの変更レビューを担当します。
+# 詳細: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @sfc-gh-shtanaka
