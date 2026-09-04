@@ -1,8 +1,10 @@
 # [デモタイトル] / [Demo Title]
 
+> [!IMPORTANT]
+>
 > **Disclaimer: This demo is not an official Snowflake product.**
 >
-> このコンテンツはデモ目的として提供されています。
+> このコンテンツはデモや学習目的として提供されています。オフィシャルプロダクトではありませんのでご注意ください。
 
 ---
 
@@ -93,7 +95,7 @@ demo/[デモフォルダ名]/
 
 ---
 
-## 作成者 / Author
+## 作成者 / Author (Github アカウント名で記載)
 
 - 作成者: [名前]
 - 作成日: YYYY-MM

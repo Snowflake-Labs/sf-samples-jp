@@ -13,16 +13,16 @@ POC向けのデモスクリプト・Streamlit アプリ・Notebook などを管�
 ## フォルダ命名規則
 
 ```
-YYYYMM_デモ名/
+デモ名/
 ```
 
 例:
 ```
 demo/
-├── 202501_cortex-analyst-text-to-sql/
+├── cortex-analyst-text-to-sql/
 │   ├── README.md
 │   └── ...
-└── 202502_streamlit-data-app/
+└── streamlit-data-app/
     ├── README.md
     └── ...
 ```
