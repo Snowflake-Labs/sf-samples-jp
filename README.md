@@ -25,7 +25,7 @@ Snowflake Japan が提供する、日本向けのサンプルコード・デモ�
 ```
 sf-samples-jp/
 ├── events/     # イベント・勉強会・カンファレンス向けコンテンツ
-├── demo/       # 商談・POC向けデモスクリプト・Streamlitアプリ
+├── demo/       # POC向けデモスクリプト・Streamlitアプリ
 └── handson/    # ハンズオンワークショップ向けSQL・手順書
 ```
 
