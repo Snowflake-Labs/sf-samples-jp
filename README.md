@@ -3,14 +3,12 @@
 Snowflake Japan が提供する、日本向けのサンプルコード・デモ・ハンズオン資材のリポジトリです。
 
 ---
-
+> [!IMPORTANT]
+>
 > **Disclaimer / 免責事項**
+> **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**. **This content is not an official Snowflake product.**
 >
-> **Disclaimer: This demo is not an official Snowflake product.**
->
-> **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**.
->
-> **[JA]** このリポジトリ内のすべてのコード・コンテンツは、**デモおよび学習目的のみ** を意図して提供されています。
+> **[JA]** このリポジトリ内のすべてのコード・コンテンツは、**デモおよび学習目的のみ** を意図して提供されています。オフィシャルプロダクトではありませんのでご注意ください。
 
 ---
 
