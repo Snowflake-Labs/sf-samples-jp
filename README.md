@@ -6,6 +6,7 @@ Snowflake Japan が提供する、日本向けのサンプルコード・デモ�
 > [!IMPORTANT]
 >
 > **Disclaimer / 免責事項**
+>
 > **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**. **This content is not an official product.**
 >
 > **[JA]** このリポジトリ内のすべてのコード・コンテンツは、**デモおよび学習目的のみ** を意図して提供されています。**公式プロダクトではありません。**
