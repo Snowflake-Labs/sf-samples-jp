@@ -32,7 +32,7 @@ Hugging Face から [comma2k19](https://huggingface.co/datasets/commaai/comma2k1
   | b0c9d2329ad1606b_2018-07-27--06-03-57_10 | 600 | 30.0 | 9.8 | 15.4 | -0.85 / 0.21 / 9.81 | train |
   | b0c9d2329ad1606b_2018-07-27--06-03-57_11 | 912 | 45.6 | 91.5 | 0.3 | 0.02 / 0.00 / 9.80 | test |
 
-![img](./docs/images/img0.png)
+![img](https://github.com/commaai/comma2k19/blob/master/assets/testmesh3d.png?raw=true)
 
 - 本プロジェクトを通して以下を学ぶことを目指します。
   - 動画・センサーログといった生のマルチモーダルデータを External Access Integration 経由で外部 (Hugging Face) から Snowflake に取り込む方法 (Phase 1)
@@ -84,6 +84,9 @@ flowchart LR
 ## 前提条件
 
 - Snowflake アカウント (Container Runtime Notebooks / ML Jobs / SPCS が利用可能であること)
+  - **必要な最低エディション: Enterprise Edition 以上。** 
+  - Snowpark Container Services (コンピュートプール / `CREATE SERVICE`。Phase 1/2/5/7 の各 ML Job、Phase 3/4/6 の Notebooks in Workspaces、Phase 9 のモデルサービングすべてで使用) は Standard Edition では利用できず、`CREATE COMPUTE POOL` が失敗します。Snowflake の通常の30日間トライアルアカウントはデフォルトで Enterprise Edition として作成されるため、そのままでこの要件を満たしますが、明示的に Standard Edition を選択したアカウントでは動作しません。
+  - エディション要件は変更される可能性があるため、実行前に [SPCS のエディション要件](https://docs.snowflake.com/ja/developer-guide/snowpark-container-services/overview)を最新のドキュメントで確認してください。
 - `ACCOUNTADMIN` 相当の権限 (初回のインフラ構築時のみ)
 - ローカル環境:　Python 3.11+、[`uv`](https://docs.astral.sh/uv/)
 - Snowflake 接続情報:　`cortex connections` で設定した接続、または `~/.snowflake/connections.toml`

@@ -32,7 +32,7 @@ Ingests the [comma2k19](https://huggingface.co/datasets/commaai/comma2k19) datas
   | b0c9d2329ad1606b_2018-07-27--06-03-57_10 | 600 | 30.0 | 9.8 | 15.4 | -0.85 / 0.21 / 9.81 | train |
   | b0c9d2329ad1606b_2018-07-27--06-03-57_11 | 912 | 45.6 | 91.5 | 0.3 | 0.02 / 0.00 / 9.80 | test |
 
-![img](./docs/images/img0.png)
+![img](https://github.com/commaai/comma2k19/blob/master/assets/testmesh3d.png?raw=true)
 
 - Through this project, we aim to learn:
   - How to ingest raw multimodal data such as video and sensor logs into Snowflake from an external source (Hugging Face) via an External Access Integration (Phase 1)
@@ -84,6 +84,9 @@ For each phase's detailed design, table/stage names, compute-pool assignments an
 ## Prerequisites
 
 - A Snowflake account (with Container Runtime Notebooks / ML Jobs / SPCS available)
+  - **Minimum edition: Enterprise Edition or higher.**
+  - Snowpark Container Services (compute pools / `CREATE SERVICE`, used by every ML Job in Phase 1/2/5/7, by Notebooks in Workspaces in Phase 3/4/6, and by Phase 9's model-serving) is not available on Standard Edition — `CREATE COMPUTE POOL` fails there. A standard 30-day Snowflake trial account defaults to Enterprise Edition, so it satisfies this requirement out of the box; only an explicitly-downgraded Standard Edition account would not.
+  - Confirm the current [SPCS edition requirement](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) before running, since edition requirements can change.
 - `ACCOUNTADMIN`-equivalent privileges (for the initial infra setup only)
 - Locally: Python 3.11+, [`uv`](https://docs.astral.sh/uv/)
 - Snowflake connection info: a connection configured via `cortex connections`, or `~/.snowflake/connections.toml`
