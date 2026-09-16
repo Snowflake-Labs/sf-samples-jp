@@ -1,0 +1,63 @@
+# Training + model config (src/train.py, src/model.py, jobs/phase7_train_distributed.py).
+# Values are inherited from the validated 45-minute handson — no hyperparameter
+# search in this sample project.
+
+snowflake:
+  database: CAR_MULTIMODAL_AI_DB
+  schema: CURATED          # SENSORS / SPLITS / FEATURES live here (src/data.py)
+
+data:
+  target: distance            # radar lead distance [m]
+  log_target: true            # regress log(distance): relative error, don't ignore near range
+  # Ego-DYNAMICS channels used by the sensor branch (must exist in the SENSORS table).
+  # NOTE: speed and wheel_speed_mean are deliberately EXCLUDED. On this commute they
+  # correlate +0.63 with lead distance purely via traffic flow (fast = open road = far
+  # lead) — a dataset-specific shortcut that would not hold on another road, and that
+  # hides the real lesson. With them removed, the sensor-only arm is honestly unable
+  # to locate the lead car (R^2 ~ 0), which is the point.
+  # They remain in the SENSORS table for the ODD discussion (Phase 4 EDA) and TTC.
+  sensor_channels:
+    - steering_angle
+    - accel_x
+    - accel_y
+    - accel_z
+    - gyro_x
+    - gyro_y
+    - gyro_z
+
+model:
+  image_feat_dim: 576         # MobileNetV3-small output (Phase 5 embedding width)
+  image_hidden: 64            # Linear(576->64) -> ReLU -> Dropout
+  sensor_hidden: 32           # Linear(n_sensor_channels->32) -> ReLU  (7 channels by default)
+  head_hidden: 64             # Linear(concat->64) -> ReLU -> Linear(64->1)
+  dropout: 0.2
+
+train:
+  loss: huber                 # SmoothL1: robust to far-range outliers
+  huber_beta: 1.0
+  optimizer: adam
+  lr: 0.001
+  batch_size: 256
+  epochs: 30
+  early_stop_patience: 5      # stop if val loss doesn't improve
+  weight_decay: 0.0
+  seed: 42
+  torch_threads: 4            # pin threads: comparable timing across environments
+  normalize_sensors: true     # StandardScaler on sensors; image features left as-is
+
+distributed:
+  # Phase 7 (jobs/phase7_train_distributed.py): PyTorchDistributor scaling config.
+  # Default is real multi-node torch.distributed DDP across 4 containers, so
+  # running Phase 7 with no flags demonstrates actual distributed training rather
+  # than a single-node fallback. This data volume (~22.5k samples) doesn't need
+  # 4 nodes for speed — it's the default specifically to keep the "distributed
+  # training" phase distributed out of the box. Override with
+  # `scripts/submit_phase7.py --nodes N` (N=1 for a quick single-node smoke test).
+  num_nodes: 4
+  # One DDP worker per node (CPU_X64_M nodes have ~6 vCPUs; num_workers_per_node=4
+  # would request 4 workers * num_cpus_per_worker CPUs *per node*, which is more
+  # CPU than a single CPU_X64_M node has — confirmed via a real
+  # "worker group startup timed out... infeasible resource request" error).
+  num_workers_per_node: 1
+  num_cpus_per_worker: 4
+  use_gpu: false               # set true + MULTIMODAL_GPU_POOL to demo GPU scale-out

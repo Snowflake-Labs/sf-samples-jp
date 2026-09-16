@@ -1,0 +1,37 @@
+# Data + build artifacts — never commit
+/dl/
+/data/
+/runs/
+/outputs/
+*.hevc
+*.mp4
+
+# Local Snowflake connection / secrets — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+conf/local_*.yaml
+conf/*_secrets.yaml
+connections.toml
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+AGENTS.md
+REPORT.md
+
+.cortex/
+
+blog/
