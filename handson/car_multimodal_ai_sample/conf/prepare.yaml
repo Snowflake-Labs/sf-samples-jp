@@ -1,0 +1,94 @@
+# Raw ingestion + extraction config (jobs/phase1_ingest_raw.py, jobs/phase2_extract_organize.py).
+# Adapted from the 45-minute handson's conf/prepare.yaml: paths point at Snowflake
+# stages instead of the local filesystem. The sampling/label/crop values themselves
+# are unchanged (validated design).
+
+huggingface:
+  repo_id: commaai/comma2k19
+  repo_type: dataset
+  # Which raw_data/Chunk_N.zip files to ingest. Default is Chunk_1 only (8.73 GB,
+  # ~188 segments) — the validated scope. To use the FULL dataset,
+  # set this to "all" (expands to Chunk_1..Chunk_10, ~94.6 GB total across 10
+  # files, ~2,019 segments) or list specific chunks, e.g. ["Chunk_1", "Chunk_2"].
+  #
+  # Before switching to "all", note that Phase 1 downloads/unzips one
+  # chunk at a time (~10 GB peak local disk per chunk, cleaned up between chunks)
+  # but Phase 2 (HEVC decode) and Phase 7 (training) both scale ~10x in wall time
+  # and Phase 7's aggregate-model-fits-on-one-node assumption should be re-checked
+  # at ~2,019 segments / ~240k samples.
+  chunks: ["Chunk_1"]
+  # No token required (public, non-gated dataset — verified). Leave null unless you
+  # hit anonymous rate limits; if set, read from a Snowflake SECRET, never hardcode.
+  token_secret: null
+
+snowflake:
+  database: CAR_MULTIMODAL_AI_DB
+  external_access_integration: HF_ACCESS_INTEGRATION
+  compute_pool: MULTIMODAL_CPU_POOL
+  warehouse: MULTIMODAL_WH
+  stages:
+    raw: "@CAR_MULTIMODAL_AI_DB.RAW.RAW_STAGE"
+    images: "@CAR_MULTIMODAL_AI_DB.CURATED.IMAGES_STAGE"
+    features: "@CAR_MULTIMODAL_AI_DB.CURATED.FEATURES_STAGE"
+    misc: "@CAR_MULTIMODAL_AI_DB.CURATED.MISC_STAGE"
+    job: "@CAR_MULTIMODAL_AI_DB.CURATED.JOB_STAGE"
+
+sampling:
+  # comma2k19 video is 20 Hz. We keep every Nth frame -> target_hz.
+  source_hz: 20
+  target_hz: 2                    # 2 Hz * 60 s * ~188 seg = ~22,500 samples
+
+label:
+  # Radar value columns: [fwd_dist_m, lat_dist_m, rel_speed_mps, nan, nan, address, new_track]
+  ego_lane_half_width_m: 2.0      # |lat| < this -> counted as in-lane (tunable)
+  radar_time_tol_s: 0.1           # match radar obs within +/- this of a camera frame time
+  min_distance_m: 1.0             # reject non-physical / zero returns
+  max_distance_m: 150.0           # radar range ceiling; beyond -> treat as no lead
+
+# 9 ego-motion channels synced to each camera-frame time. Chosen so that NONE of
+# them can reveal the lead vehicle's position -> this is the "sensor-only fails"
+# arm of the ablation. Order here defines the SENSORS table
+# column order (jobs/phase2_extract_organize.py).
+sensor_channels:
+  - speed              # CAN/speed (m/s) — kept in the table, excluded from training input
+  - steering_angle      # CAN/steering_angle (deg)
+  - wheel_speed_mean    # mean of CAN/wheel_speed 4 wheels — also excluded from training input
+  - accel_x             # IMU/accelerometer
+  - accel_y
+  - accel_z
+  - gyro_x              # IMU/gyro
+  - gyro_y
+  - gyro_z
+
+features:
+  backbone: mobilenet_v3_small    # frozen ImageNet backbone (Phase 5)
+  dim: 576                        # penultimate feature width
+  input_size: 224
+  dtype: float16
+  # Crop the frame to the lower-centre road region BEFORE the backbone so the
+  # lead vehicle fills more pixels (image-only R^2 0.08 -> 0.37).
+  # Fractions of the 874x1164 frame. Set enabled:false for the full frame.
+  crop:
+    enabled: true
+    top: 0.40      # just below the horizon
+    bottom: 0.82   # above the dashboard/hood
+    left: 0.22
+    right: 0.78
+
+thumbnail:
+  width: 160
+  height: 80
+  quality: 80
+
+split:
+  # Segment-level split. Fractions of segments, assigned
+  # deterministically. Randomizing at the frame level leaks across train/val/test.
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  seed: 42
+
+runtime:
+  # jobs/phase2_extract_organize.py uses Ray Data map_batches for parallelism
+  # instead of a fixed worker-process pool (Snowflake ML Jobs / Ray runtime).
+  torch_threads: 1               # per-worker torch threads (Ray gives parallelism)

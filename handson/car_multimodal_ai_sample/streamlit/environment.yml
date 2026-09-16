@@ -1,0 +1,8 @@
+name: multimodal_streamlit
+channels:
+  - snowflake
+dependencies:
+  - streamlit
+  - pandas
+  - plotly
+  - snowflake-ml-python
