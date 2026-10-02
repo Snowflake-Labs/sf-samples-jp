@@ -10,7 +10,7 @@ Snowflake Japan が提供する、日本向けのサンプルコード・デモ�
 > This application is not part of the Snowflake Service and is governed by the terms in LICENSE, unless expressly agreed to in writing. You use this application at your own risk, and Snowflake has no obligation to support your use of this application.
 >
 > （参考訳）本アプリケーションは Snowflake Service の一部ではなく、書面による明示的な合意がない限り LICENSE の条件に従います。本アプリケーションの利用はご自身の責任で行うものとし、Snowflake は本アプリケーションの利用に関していかなるサポート義務も負いません。
-> **※ この日本語訳は参考であり、必ず英文を確認してください。**
+> **※ この日本語訳は参考であり、必ず上記英文を確認してください。**
 >
 > [Read more](./LEGAL.md)
 
@@ -34,7 +34,7 @@ sf-samples-jp/
 
 | フォルダ | 説明 |
 |---------|------|
-| [`events/`](./events/) | Snowday Japan などのイベントごとのコンテンツ。イベント名のサブフォルダで管理します |
+| [`events/`](./events/) | Snowflake World Tour Tokyo などのイベントごとのコンテンツ。イベント名のサブフォルダで管理します |
 | [`demo/`](./demo/) | 商談・POCで使用するデモスクリプト、Streamlit アプリ、Notebook など |
 | [`handson/`](./handson/) | ハンズオンワークショップ向けの SQL スクリプトや手順書 |
 
