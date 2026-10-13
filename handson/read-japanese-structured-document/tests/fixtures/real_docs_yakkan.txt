@@ -1,0 +1,11 @@
+# 実文書を読むテストが使う約款の文書（Hugging Face から取得する。tests/fixtures/data_roots.py）
+auto-0001--nl-a4-2col-mincho
+auto-0001--nl-b5-2col-dense
+golf-0001--nl-a4-2col-mincho
+health-0001--nl-a4-2col-mincho
+jyusetsu-0001--jys-a4-1col-gothic
+life-0001--life-a4-1col-gothic
+life-0001--life-b5-1col-mincho
+quake-0002--nl-b5-2col-dense
+teikan-0001--teikan-a4-1col-mincho
+travel-0001--nl-a4-1col-gothic

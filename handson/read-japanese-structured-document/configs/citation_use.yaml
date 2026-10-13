@@ -1,0 +1,24 @@
+# 引用の使い方の区分（D-1⁵ = B・2026-09-28・W17-A）
+#
+# 文書系統（doc_id の先頭）ごとに、成果物の引用をどう使ってよいかを定める。
+# 区分は評価で測った系統別の引用誤り率から決めた（予測時に gold は使わない。値をここに固定する）。
+# 閾値は人間の判断（HUMAN-REVIEW D-1⁵ の案をそのまま採用）：
+#   evidence  : 誤り率 2% 未満  … 引用付きの回答の根拠として使ってよい
+#   verify    : 2〜7%           … 引用を示してよいが、支払の可否に関わる回答では人が確かめる
+#   candidate : 7% 以上         … 引用は候補として示し、人が確かめる前提で使う
+#
+# 測定：成果物 2026-09-28T04-40-46Z__OUT__direct（W17-B 後）
+# 未知の系統は candidate とする（測っていないものを根拠にしない）。
+source_run: 2026-09-28T04-40-46Z__OUT__direct
+default: candidate
+genres:
+  jyusetsu: {use: evidence, error_rate: 0.0000, n: 165}
+  teikan:   {use: evidence, error_rate: 0.0000, n: 318}
+  oneday:   {use: evidence, error_rate: 0.0081, n: 247}
+  golf:     {use: evidence, error_rate: 0.0098, n: 305}
+  auto:     {use: evidence, error_rate: 0.0149, n: 403}
+  life:     {use: evidence, error_rate: 0.0156, n: 256}
+  group:    {use: evidence, error_rate: 0.0178, n: 507}
+  quake:    {use: verify,   error_rate: 0.0251, n: 319}
+  health:   {use: verify,   error_rate: 0.0346, n: 434}
+  travel:   {use: candidate, error_rate: 0.0990, n: 293}

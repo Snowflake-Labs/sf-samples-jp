@@ -1,0 +1,36 @@
+# 作業台帳と作業規約（公開しない）
+TASK.md
+AGENTS.md
+
+# データセット（実行時に Hugging Face から取得する。取得したものは一切コミットしない）
+data/
+*.pdf
+*.png
+
+# 出力・作業物・ログ・退避した評価記録
+out/
+work/
+logs/
+results/
+
+# ローカル設定（接続名・データの場所・イメージタグ）
+configs/deploy.local.env
+.env
+
+# 図の few-shot 期待 JSON（データセットの正解から生成するため）
+configs/shots/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# uv.lock から build_push.sh が生成する
+container/requirements.lock
+
+docs/

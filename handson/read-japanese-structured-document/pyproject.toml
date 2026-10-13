@@ -1,0 +1,58 @@
+[project]
+name = "jpdocread"
+version = "0.1.0"
+description = "日本語の構造化文書（保険約款・契約書）を Cortex AI で読み取るハンズオンのパイプライン"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # 設定とデータ取得（H1・H2）
+    "PyYAML>=6.0",
+    "pydantic>=2.7",
+    "huggingface_hub>=0.24",
+    # 読み取り（read/ が使う。移植元と同じ下限）
+    "pdfplumber>=0.11",
+    "pypdfium2>=4.30",
+    "rapidfuzz>=3.9",
+    "zss>=1.2",
+    "numpy>=1.26",
+    "Pillow>=10.3",
+    # Snowflake への接続（H4 以降）
+    "snowflake-connector-python>=3.12",
+]
+
+[project.scripts]
+jpdocread = "jpdocread.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jpdocread"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["data", "out", "work", "logs", "results"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# 行の長さは ruff format が揃える。E501 は全角を幅 2 で数え、日本語の docstring・メッセージで過剰に出るので外す
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# 移植したコードは判定ロジックを書き換えない。書き方の簡略化を求める SIM は移植元と同じく適用しない
+"src/jpdocread/read/**" = ["SIM"]
+"src/jpdocread/eval/**" = ["SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-m 'not integration and not network' -ra"
+markers = [
+    "network: Hugging Face に実際に接続する試験（既定で除外。`uv run pytest -m network` で実行）",
+    "integration: Snowflake の検証用接続を使う試験（既定で除外。`uv run pytest -m integration` で実行）",
+]

@@ -1,0 +1,3 @@
+# 実文書を読むテストが使う契約書の文書（Hugging Face から取得する。tests/fixtures/data_roots.py）
+lea-0004--ct-a4-1col-form
+sys-0004--ct-a4-1col-mincho

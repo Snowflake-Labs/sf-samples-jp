@@ -1,0 +1,60 @@
+# 契約書コーパスの設定
+name: contract
+title: 日本語ビジネス契約書（Japanese Contract Document Understanding）
+
+source:
+  kind: huggingface                   # huggingface（既定）| local（開発用）
+  huggingface:
+    repo_id: cvusk/japanese-contract-document-understanding   # CC BY 4.0
+    revision: b68d25d45385ce45e70833a1e0a2c6072143f666        # 40 桁のコミット SHA で固定する（main は使わない）
+  local:
+    path: ${DATA_ROOT_CONTRACT}       # kind: local のときだけ使う。環境変数 → configs/deploy.local.env の順で展開する
+
+structure_builder: contract  # auto | yakkan | contract（contract はこのコーパス以外の体裁を受け付けない）
+features:
+  parties: true
+  defined_terms: true
+
+# 図の few-shot 供出元（timeline・flowchart 各 1）。移植元の値
+figure_shots:
+  - emp-0003--ct-a4-1col-form
+  - pur-0002--ct-a4-1col-mincho
+
+# 評価から除外する文書：供出元と、同じ content の別版面（同じ図を持つので shot の答えが漏れる。移植元 C-002）
+eval_excluded:
+  - emp-0003--ct-a4-1col-form
+  - emp-0003--ct-a4-1col-mincho
+  - pur-0002--ct-a4-1col-form
+  - pur-0002--ct-a4-1col-mincho
+
+# スライス。all は manifest の status: ready から決まるので書かない
+# pilot は移植元の値（doctype ごとに 1 文書、form と mincho が交互の 10 文書）
+slices:
+  pilot:
+    - con-0002--ct-a4-1col-mincho
+    - csl-0003--ct-a4-1col-form
+    - dlg-0005--ct-a4-1col-form
+    - emp-0004--ct-a4-1col-mincho
+    - lea-0004--ct-a4-1col-form
+    - lic-0003--ct-a4-1col-mincho
+    - nda-0003--ct-a4-1col-form
+    - ots-0002--ct-a4-1col-mincho
+    - pur-0005--ct-a4-1col-form
+    - sys-0004--ct-a4-1col-mincho
+
+# 見込みクレジットの係数：正解の図 1 つあたりに検出される図領域の数
+# 移植元の実測（契約書 100 文書で 374 領域 / 104 図）
+cost:
+  figure_regions_per_gold_figure: 3.6
+
+# 出力 JSON の provenance.known_limits（移植元の実測値と出典）
+known_limits:
+  source: 読み取り手法の開発時の評価（契約書 96 文書）。本ハンズオンの実測ではない
+  caveat: 合成コーパス（born-digital のみ）での値。日本語は AI_PARSE_DOCUMENT の公式対応言語に含まれない。図領域は過剰検出（正解 104 図に対し 374 領域）
+  citation_error_rate_all: 0.0035
+  citation_coverage_all: 0.996
+  text_cer_all: 0.057
+  table_cell_f1_all: 0.917
+  figure_edge_f1_all: 0.824
+  parties_f1_all: 1.0
+  defined_terms_f1_all: 0.894

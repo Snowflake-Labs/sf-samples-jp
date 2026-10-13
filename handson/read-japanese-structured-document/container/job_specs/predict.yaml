@@ -1,0 +1,58 @@
+# 予測側ジョブ（S30・S50）の仕様テンプレート。
+# OPS.RUN_JOB が EXECUTE JOB SERVICE … USING (…) で値を埋める。USING の値は JSON リテラルとして差し込まれるので、
+# YAML のスカラー全体を 1 つの変数にする（部分置換しない）。
+# コマンドをシェルで包まない（`sh -c "…; exit 0"` は失敗を握りつぶす）。
+spec:
+  containers:
+  - name: main
+    image: {{ image }}
+    command:
+    - python
+    - -m
+    - jpdocread
+    - job
+    - {{ step }}
+    - --run-id
+    - {{ run_id }}
+    env:
+      JPDOCREAD_IMAGE_TAG: {{ image_tag }}
+      JPDOCREAD_WAREHOUSE: {{ warehouse }}
+      JPDOCREAD_FAIL_DOCS: {{ fail_docs }}
+      JPDOCREAD_DOCS: {{ docs_dir }}
+      JPDOCREAD_STAGE_DOCS: /stage/docs
+      JPDOCREAD_STAGE_WORK: /stage/work
+      JPDOCREAD_STAGE_RESULTS: /stage/results
+    resources:
+      requests:
+        cpu: 1
+        memory: 3Gi
+      limits:
+        cpu: 2
+        memory: 6Gi
+    volumeMounts:
+    - name: docs
+      mountPath: /stage/docs
+    - name: work
+      mountPath: /stage/work
+    - name: results
+      mountPath: /stage/results
+  volumes:
+  # ステージボリュームへの書き込みには uid / gid の指定が要る（コンテナは uid 1000 で動く）
+  - name: docs
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_docs }}
+  - name: work
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_work }}
+  - name: results
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_results }}
