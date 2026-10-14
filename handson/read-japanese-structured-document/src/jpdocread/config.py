@@ -85,6 +85,11 @@ class FeaturesConfig(_Strict):
     defined_terms: bool = False
 
 
+class TablesConfig(_Strict):
+    # ページ・段をまたぐ表を 1 つにつなぐか（read/stitch.py）。False なら従来どおりページごとの表を出す
+    stitch: bool = False
+
+
 class CorpusCostConfig(_Strict):
     figure_regions_per_gold_figure: float = Field(ge=0)
 
@@ -95,6 +100,7 @@ class CorpusConfig(_Strict):
     source: SourceConfig
     structure_builder: Literal["auto", "yakkan", "contract"]
     features: FeaturesConfig = FeaturesConfig()
+    tables: TablesConfig = TablesConfig()
     figure_shots: list[str]
     eval_excluded: list[str]
     slices: dict[str, list[str]]

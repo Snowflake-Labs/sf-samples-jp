@@ -40,6 +40,11 @@ slices:
     - jyusetsu-0001--jys-a4-1col-gothic
     - teikan-0001--teikan-a4-1col-mincho
 
+# ページ・段をまたぐ表を 1 つにつなぐか（read/stitch.py）。false なら従来どおりページごとの表を出す。
+# 既定は true（held-out で表のセル F1 が上がり、誤連結 0 だった）
+tables:
+  stitch: true
+
 # 見込みクレジットの係数：正解の図 1 つあたりに検出される図領域の数
 # 移植元の実測（約款 41 文書の時点で 321 領域 / 117 図）
 cost:

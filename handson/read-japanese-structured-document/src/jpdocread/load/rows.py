@@ -33,7 +33,11 @@ ARRAY_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
             "refs_to",
         ),
     ),
-    "TABLES": ("tables", ("id", "pages", "source", "n_rows", "n_cols", "grid")),
+    # fragments・stitch はページ・段をまたぐ表をつないだときだけある（read/stitch.py）。無ければ NULL
+    "TABLES": (
+        "tables",
+        ("id", "pages", "source", "n_rows", "n_cols", "grid", "fragments", "stitch"),
+    ),
     "FIGURES": (
         "figures",
         ("id", "pages", "bbox", "source", "nodes", "edges", "paths", "crop", "query_id"),

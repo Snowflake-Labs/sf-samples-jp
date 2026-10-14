@@ -66,6 +66,7 @@ def read_options(corpus: CorpusConfig) -> dict:
         "structure_builder": corpus.structure_builder,
         "parties": corpus.features.parties,
         "defined_terms": corpus.features.defined_terms,
+        "stitch_tables": corpus.tables.stitch,
         "known_limits": dict(corpus.known_limits),
     }
 

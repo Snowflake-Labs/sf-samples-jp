@@ -100,7 +100,12 @@ CREATE TABLE IF NOT EXISTS <% db %>.<% schema_output %>.ELEMENTS (
   label STRING, citation STRING, parent_id STRING, text STRING, pages ARRAY, refs_to ARRAY);
 CREATE TABLE IF NOT EXISTS <% db %>.<% schema_output %>.TABLES (
   run_id STRING, corpus STRING, doc_id STRING, seq INT, item_id STRING, pages ARRAY, source STRING,
-  n_rows INT, n_cols INT, grid VARIANT);
+  n_rows INT, n_cols INT, grid VARIANT, fragments VARIANT, stitch VARIANT);
+-- fragments・stitch はページ・段をまたぐ表をつないだときの元の断片と判定の根拠（無ければ NULL）。
+-- 列を足す前に作った表にも追いつくよう、列ごとに足す（1 文で複数の列を IF NOT EXISTS で足すと、
+-- 2 回目の実行で 2 つ目以降の列が「already exists」になる）
+ALTER TABLE IF EXISTS <% db %>.<% schema_output %>.TABLES ADD COLUMN IF NOT EXISTS fragments VARIANT;
+ALTER TABLE IF EXISTS <% db %>.<% schema_output %>.TABLES ADD COLUMN IF NOT EXISTS stitch VARIANT;
 CREATE TABLE IF NOT EXISTS <% db %>.<% schema_output %>.FIGURES (
   run_id STRING, corpus STRING, doc_id STRING, seq INT, item_id STRING, pages ARRAY, bbox ARRAY, source STRING,
   nodes VARIANT, edges VARIANT, paths VARIANT, crop STRING, query_id STRING);

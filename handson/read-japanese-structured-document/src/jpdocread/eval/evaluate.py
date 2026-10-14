@@ -33,6 +33,7 @@ from . import contract_semantics as CS
 from .gold import assert_checksums, load_elements, load_gold, load_source
 from .metrics_figure import score_figure
 from .metrics_order import nted_doc
+from .metrics_span import span_scores, summarize_spans
 from .metrics_structure import nted, number_integrity
 from .metrics_table import norm_cell, score_table
 from .metrics_text import char_f1, score_text
@@ -260,6 +261,18 @@ def table_scores(doc_id: str, pred: dict) -> list[dict]:
     return rows
 
 
+def table_span_scores(doc_id: str, pred: dict, tables: list[dict]) -> dict:
+    """ページ・段をまたぐ表の採点（eval/metrics_span.py）。`tables` は `table_scores` の結果。"""
+    gold_tables = [e for e in load_elements(doc_id) if e.get("kind") == "table"]
+    grids = {}
+    for e in gold_tables:
+        g = grid_from_elements(doc_id, e["element_id"])
+        if g:
+            grids[e["element_id"]] = g
+    f1 = {t["table_id"]: t["cell_f1"] for t in tables}
+    return span_scores(gold_tables, grids, pred.get("tables") or [], f1)
+
+
 # ---------------------------------------------------------------- 図
 
 
@@ -407,6 +420,7 @@ def score_document(doc_id: str, out_dir: Path | None = None) -> dict:
     pred = load_pred(doc_id, out_dir)
     ts = text_scores(doc_id, pred)
     cit, errors = citation_scores(doc_id, pred)
+    tables = table_scores(doc_id, pred)
     return {
         "doc_id": doc_id,
         "style_id": doc_id.split("--", 1)[1],
@@ -423,7 +437,9 @@ def score_document(doc_id: str, out_dir: Path | None = None) -> dict:
         },
         "citation": cit,
         "structure": structure_scores(doc_id, pred),
-        "tables": table_scores(doc_id, pred),
+        "tables": tables,
+        # ページ・段をまたぐ表（分断度・誤連結・またぎ方別のセル F1）。既存の tables の値は変えない
+        "table_spans": table_span_scores(doc_id, pred, tables),
         "figures": figure_scores(doc_id, pred),
         "refs": ref_scores(doc_id, pred),
         # 契約書の軸（C-007）：当事者・定義語
@@ -553,6 +569,7 @@ def summarize(docs: list[dict], missing: list[str], excluded: list[str]) -> dict
                 "path_f1": _mean([f["path_f1"] for f in figs_c70]),
             },
         },
+        "table_spans": summarize_spans([d["table_spans"] for d in docs if "table_spans" in d]),
         "refs": summarize_refs([d["refs"] for d in docs]),
         "parties": CS.summarize([d.get("parties") for d in docs]),
         "terms": CS.summarize([d.get("terms") for d in docs]),
@@ -665,6 +682,7 @@ def as_rows(result: dict, eval_run_id: str, pred_run_id: str) -> dict[str, list[
                     )
                 },
                 "tables": d["tables"],
+                "table_spans": d["table_spans"],
                 "figures": d["figures"],
             }
             for d in docs

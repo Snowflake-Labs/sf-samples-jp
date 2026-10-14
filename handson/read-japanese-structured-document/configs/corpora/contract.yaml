@@ -42,6 +42,11 @@ slices:
     - pur-0005--ct-a4-1col-form
     - sys-0004--ct-a4-1col-mincho
 
+# ページ・段をまたぐ表を 1 つにつなぐか（read/stitch.py）。false なら従来どおりページごとの表を出す。
+# 既定は true（held-out で表のセル F1 が上がり、誤連結 0 だった）
+tables:
+  stitch: true
+
 # 見込みクレジットの係数：正解の図 1 つあたりに検出される図領域の数
 # 移植元の実測（契約書 100 文書で 374 領域 / 104 図）
 cost:

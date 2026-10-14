@@ -104,14 +104,16 @@ BEGIN
          f.value:refs_to::ARRAY
   FROM S55_SRC s, LATERAL FLATTEN(input => s.j:elements) f;
   DELETE FROM <% db %>.<% schema_output %>.TABLES WHERE run_id = :P_RUN_ID AND doc_id IN (SELECT doc_id FROM S55_SRC);
-  INSERT INTO <% db %>.<% schema_output %>.TABLES (run_id, corpus, doc_id, seq, item_id, pages, source, n_rows, n_cols, grid)
+  INSERT INTO <% db %>.<% schema_output %>.TABLES (run_id, corpus, doc_id, seq, item_id, pages, source, n_rows, n_cols, grid, fragments, stitch)
   SELECT s.run_id, s.corpus, s.doc_id, f.index,
          f.value:id::STRING,
          f.value:pages::ARRAY,
          f.value:source::STRING,
          f.value:n_rows::INT,
          f.value:n_cols::INT,
-         f.value:grid
+         f.value:grid,
+         f.value:fragments,
+         f.value:stitch
   FROM S55_SRC s, LATERAL FLATTEN(input => s.j:tables) f;
   DELETE FROM <% db %>.<% schema_output %>.FIGURES WHERE run_id = :P_RUN_ID AND doc_id IN (SELECT doc_id FROM S55_SRC);
   INSERT INTO <% db %>.<% schema_output %>.FIGURES (run_id, corpus, doc_id, seq, item_id, pages, bbox, source, nodes, edges, paths, crop, query_id)

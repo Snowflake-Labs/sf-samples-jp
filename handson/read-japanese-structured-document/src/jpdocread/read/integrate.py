@@ -31,6 +31,7 @@ from .parse.r4_local import read_pages_text
 from .parse.r12_cortex import parse_doc
 from .regions import read_regions
 from .spine import reader_for
+from .stitch import stitch_tables
 from .structure.tree import build_tree_for_doc
 from .tables_r2 import cached_layout_pages, tables_for_doc
 
@@ -309,6 +310,9 @@ class ReadOptions:
     parties: bool = True
     defined_terms: bool = True
     known_limits: dict = field(default_factory=dict)
+    # ページ・段をまたぐ表を 1 つにつなぐ（read/stitch.py）。既定は従来どおりつながない。
+    # 位置引数で作る呼び出しを壊さないよう末尾に置く
+    stitch_tables: bool = False
 
     @classmethod
     def from_corpus(cls, corpus) -> ReadOptions:
@@ -317,6 +321,7 @@ class ReadOptions:
             parties=corpus.features.parties,
             defined_terms=corpus.features.defined_terms,
             known_limits=dict(corpus.known_limits),
+            stitch_tables=corpus.tables.stitch,
         )
 
 
@@ -383,7 +388,12 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
     figs = [r for r in regions if r.kind == "figure"]
     # 領域ファイルが存在するか（0 件と未実行の区別に使う。下記 P2）
     has_regions = bool(regions) or _regions_built(doc_id)
-    tables = tables_for_doc(doc_id) if cached_layout_pages(doc_id) else []
+    layout_pages = cached_layout_pages(doc_id)
+    tables = tables_for_doc(doc_id) if layout_pages else []
+    if opts.stitch_tables and tables:
+        tables = stitch_tables(
+            tables, layout_pages, {p: pt.furniture for p, pt in local_pages.items()}
+        )
     figures = figures_with_graph(doc_id, figs)
     # **契約書では列挙表の行と同じ文字の号を外さない（C-009）。** 約款の規則（D-023）は gold が罫線の無い列挙表を
     # 号として持たない前提だったが、契約書では LAYOUT が本物の号の並び（`(1)…(4)`）を表と見なし、pilot で本物の号
@@ -456,6 +466,12 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
                 "P3": {
                     "method": "R2（LAYOUT）のパイプ表と罫線なし列挙表から格子を復元（AI 追加呼び出しなし）",
                     "n_tables": len(tables),
+                    # ページ・段をまたぐ表をつないだとき（read/stitch.py）だけ出す。つながないときは従来と同じ
+                    **(
+                        {"n_stitched": sum(1 for t in tables if t.get("fragments"))}
+                        if opts.stitch_tables
+                        else {}
+                    ),
                 },
                 "P4": {
                     "method": "検出した図領域ごとに AI_COMPLETE few-shot（2 例）でノード・辺を抽出",
@@ -484,6 +500,8 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
                 "parties": opts.parties,
                 "defined_terms": opts.defined_terms,
                 "contract_scheme_detected": bool(sem.get("numbering_scheme")),
+                # つながないときはキーを出さない（従来の出力とバイト単位で同じにする）
+                **({"stitch_tables": True} if opts.stitch_tables else {}),
             },
         },
     }

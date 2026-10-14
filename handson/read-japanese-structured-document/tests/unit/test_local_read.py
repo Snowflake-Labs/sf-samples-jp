@@ -186,6 +186,7 @@ def test_read_options_follow_corpus_config():
         "structure_builder": "contract",
         "parties": c.features.parties,
         "defined_terms": c.features.defined_terms,
+        "stitch_tables": c.tables.stitch,
         "known_limits": {"source": "s"},
     }
 
