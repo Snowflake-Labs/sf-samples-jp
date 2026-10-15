@@ -6,6 +6,7 @@ AGENTS.md
 data/
 *.pdf
 *.png
+!imgs/*.png
 
 # 出力・作業物・ログ・退避した評価記録
 out/
