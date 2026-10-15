@@ -69,25 +69,46 @@ def fail_injected(step: str, doc_id: str, spec: str | None = None) -> None:
         raise RuntimeError(f"故障注入（JPDOCREAD_FAIL_DOCS）: {step}:{doc_id}")
 
 
+ELEMENT_KEYS = ("element_id", "node_kind", "citation", "text", "pages")
+
+
 def validate_output(out: dict) -> None:
     """出力 JSON の最小スキーマ検査。違反は例外（黙って書かない）。"""
+    _check_top(out)
+    _check_elements(out["elements"])
+    _check_pages(out["pages"])
+    # 契約書の体裁を判定した出力は、当事者に呼称と名称を必ず持つ（移植元 C-010）
+    if out["numbering_scheme"] is not None:
+        _check_parties(out["parties"])
+
+
+def _check_top(out: dict) -> None:
+    from .read.integrate import SCHEMA_VERSION
+
     missing = [k for k in (*REQUIRED_KEYS, *CONTRACT_KEYS) if k not in out]
     if missing:
         raise ValueError(f"出力 JSON に必須キーが無い: {missing}")
-    if out["schema_version"] != "1.2":
-        raise ValueError(f"schema_version が 1.2 でない: {out['schema_version']}")
-    for e in out["elements"]:
-        for k in ("element_id", "node_kind", "citation", "text", "pages"):
+    if out["schema_version"] != SCHEMA_VERSION:
+        raise ValueError(f"schema_version が {SCHEMA_VERSION} でない: {out['schema_version']}")
+
+
+def _check_elements(elements: list[dict]) -> None:
+    for e in elements:
+        for k in ELEMENT_KEYS:
             if k not in e:
                 raise ValueError(f"elements[] に {k} が無い: {e.get('element_id')}")
-    for p in out["pages"]:
+
+
+def _check_pages(pages: list[dict]) -> None:
+    for p in pages:
         if "number" not in p or "text" not in p:
             raise ValueError("pages[] に number / text が無い")
-    # 契約書の体裁を判定した出力は、当事者に呼称と名称を必ず持つ（移植元 C-010）
-    if out["numbering_scheme"] is not None:
-        for pt in out["parties"]:
-            if not pt.get("alias") or not pt.get("name"):
-                raise ValueError(f"parties[] に alias / name が無い: {pt}")
+
+
+def _check_parties(parties: list[dict]) -> None:
+    for pt in parties:
+        if not pt.get("alias") or not pt.get("name"):
+            raise ValueError(f"parties[] に alias / name が無い: {pt}")
 
 
 def run_info(conn: SnowflakeConnection, run_id: str) -> dict:
@@ -124,7 +145,7 @@ def _check_docs_root(corpus: str) -> None:
 
 
 def _figure_candidates(figures: list[dict]) -> list[tuple[int, list[float], int]]:
-    """図のノード候補数（自前の幾何から数えた語の塊）を (ページ, bbox, ノード数) で並べる。
+    """図のノード候補数（`figures_r4.figures_for_doc` が領域内の語を塊にしたノード）を (ページ, bbox, ノード数) で並べる。
 
     max_tokens の見積もりに使う。正解の要素数は使わない（予測経路に正解を入れない。移植元 D-006）。
     """
@@ -133,18 +154,12 @@ def _figure_candidates(figures: list[dict]) -> list[tuple[int, list[float], int]
 
 def _node_count(region: Region, cand: list[tuple[int, list[float], int]]) -> int:
     """図の領域に収まる最初の候補のノード数（0.5pt の余裕を見る）。図以外・該当なしは 0。"""
+    from .common.bbox import contains
+
+    if region.kind != "figure":
+        return 0
     return next(
-        (
-            n
-            for pg, bb, n in cand
-            if region.kind == "figure"
-            and pg == region.page
-            and bb[0] >= region.bbox_pt[0] - 0.5
-            and bb[1] >= region.bbox_pt[1] - 0.5
-            and bb[2] <= region.bbox_pt[2] + 0.5
-            and bb[3] <= region.bbox_pt[3] + 0.5
-        ),
-        0,
+        (n for pg, bb, n in cand if pg == region.page and contains(region.bbox_pt, bb, tol=0.5)), 0
     )
 
 
@@ -201,6 +216,7 @@ def _replace_regions(
 
 def cmd_s30(run_id: str, only: list[str] | None = None) -> int:
     from .common import sf
+    from .config import load_corpus_config
     from .read.figures_r4 import figures_for_doc
     from .read.geometry import write_geometry
     from .read.regions import build_regions
@@ -208,6 +224,10 @@ def cmd_s30(run_id: str, only: list[str] | None = None) -> int:
     conn = sf.connect()
     info = run_info(conn, run_id)
     _check_docs_root(info["corpus"])
+    # 図の領域の絞り込み（figures.filter_regions）。供出元には掛けない：few-shot の例画像は供出元の図の
+    # クロップの名前で引くので、供出元の領域は従来と同じにしておく
+    filter_figs = load_corpus_config(info["corpus"]).figures.filter_regions
+    donors = set(info["donors"])
     # few-shot の例画像は供出元のクロップ（S40 が同じ run の WORK から読む。移植元 T4.3）
     docs = only or sorted(set(info["docs"]) | set(info["donors"]))
     done = sf.done_docs(conn, run_id, "S30")
@@ -221,7 +241,7 @@ def cmd_s30(run_id: str, only: list[str] | None = None) -> int:
             with sf.step_doc(conn, run_id, "S30", doc_id) as box:
                 fail_injected("S30", doc_id)
                 n_lines, n_pages = write_geometry(doc_id)
-                regions = build_regions(doc_id)
+                regions = build_regions(doc_id, filter_figures=filter_figs and doc_id not in donors)
                 cand = _figure_candidates(figures_for_doc(doc_id))
                 rows = _publish_s30(run_id, info["corpus"], doc_id, regions, cand)
                 _replace_regions(conn, run_id, doc_id, rows)

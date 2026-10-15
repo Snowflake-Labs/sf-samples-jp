@@ -187,6 +187,9 @@ def test_read_options_follow_corpus_config():
         "parties": c.features.parties,
         "defined_terms": c.features.defined_terms,
         "stitch_tables": c.tables.stitch,
+        "supersede_empty_upper": c.structure.supersede_empty_upper,
+        "filter_figure_regions": c.figures.filter_regions,
+        "label_routine_repairs": c.structure.label_routine_repairs,
         "known_limits": {"source": "s"},
     }
 

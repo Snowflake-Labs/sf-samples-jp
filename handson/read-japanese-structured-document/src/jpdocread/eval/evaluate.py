@@ -31,6 +31,7 @@ from ..common.paths import OUT
 from ..read.structure.tree import Node, Tree, canonical_citation
 from . import contract_semantics as CS
 from .gold import assert_checksums, load_elements, load_gold, load_source
+from .metrics_figregion import figure_region_scores, summarize_figure_regions
 from .metrics_figure import score_figure
 from .metrics_order import nted_doc
 from .metrics_span import span_scores, summarize_spans
@@ -441,6 +442,8 @@ def score_document(doc_id: str, out_dir: Path | None = None) -> dict:
         # ページ・段をまたぐ表（分断度・誤連結・またぎ方別のセル F1）。既存の tables の値は変えない
         "table_spans": table_span_scores(doc_id, pred, tables),
         "figures": figure_scores(doc_id, pred),
+        # 図の領域（AI_COMPLETE の呼び出し単位）のうち正解の図と対応しないもの。既存の figures の値は変えない
+        "figure_regions": figure_region_scores(load_elements(doc_id), pred),
         "refs": ref_scores(doc_id, pred),
         # 契約書の軸（C-007）：当事者・定義語
         "parties": CS.party_scores(doc_id, pred),
@@ -570,6 +573,9 @@ def summarize(docs: list[dict], missing: list[str], excluded: list[str]) -> dict
             },
         },
         "table_spans": summarize_spans([d["table_spans"] for d in docs if "table_spans" in d]),
+        "figure_regions": summarize_figure_regions(
+            [d["figure_regions"] for d in docs if "figure_regions" in d]
+        ),
         "refs": summarize_refs([d["refs"] for d in docs]),
         "parties": CS.summarize([d.get("parties") for d in docs]),
         "terms": CS.summarize([d.get("terms") for d in docs]),
@@ -683,6 +689,7 @@ def as_rows(result: dict, eval_run_id: str, pred_run_id: str) -> dict[str, list[
                 },
                 "tables": d["tables"],
                 "table_spans": d["table_spans"],
+                "figure_regions": d.get("figure_regions"),
                 "figures": d["figures"],
             }
             for d in docs

@@ -310,9 +310,17 @@ class ReadOptions:
     parties: bool = True
     defined_terms: bool = True
     known_limits: dict = field(default_factory=dict)
-    # ページ・段をまたぐ表を 1 つにつなぐ（read/stitch.py）。既定は従来どおりつながない。
-    # 位置引数で作る呼び出しを壊さないよう末尾に置く
+    # ここから下は本ハンズオンで足したキー。位置引数で作る呼び出し（tests/unit/test_read_options.py）を壊さないよう、
+    # 足すときは末尾に置く。対応するコーパス設定は from_corpus の 1 か所だけに書く（local.read_options もここから作る）
+    # ページ・段をまたぐ表を 1 つにつなぐ（read/stitch.py）。既定は従来どおりつながない
     stitch_tables: bool = False
+    # 目次の続きで先に開いた空の特約・別表を本物の見出しで置き換える（tree.Builder._supersede）。既定 off
+    supersede_empty_upper: bool = False
+    # 曲線の少ない図の候補を図の領域にしない（regions.build_regions に渡す：Snowflake では S30 の jobs.cmd_s30、
+    # ローカルでは worker._task_read。S50 の build_output は provenance.read_options に記録するだけ）
+    filter_figure_regions: bool = False
+    # repair_queue の定型の棄却を resolution "routine" にする（ROUTINE_REJECTIONS）。既定 off
+    label_routine_repairs: bool = False
 
     @classmethod
     def from_corpus(cls, corpus) -> ReadOptions:
@@ -322,6 +330,9 @@ class ReadOptions:
             defined_terms=corpus.features.defined_terms,
             known_limits=dict(corpus.known_limits),
             stitch_tables=corpus.tables.stitch,
+            supersede_empty_upper=corpus.structure.supersede_empty_upper,
+            filter_figure_regions=corpus.figures.filter_regions,
+            label_routine_repairs=corpus.structure.label_routine_repairs,
         )
 
 
@@ -339,7 +350,9 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
     """
     if not opts.known_limits:
         raise ValueError("known_limits が空（コーパス設定の known_limits を ReadOptions に渡す）")
-    tree = build_tree_for_doc(doc_id, builder=opts.structure_builder)
+    tree = build_tree_for_doc(
+        doc_id, builder=opts.structure_builder, supersede_empty_upper=opts.supersede_empty_upper
+    )
     reader = reader_for(doc_id)
     local_pages = {pt.page: pt for pt in read_pages_text(doc_id)}
     if reader == "R2":
@@ -439,7 +452,12 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
         **({} if opts.parties else {"parties": []}),
         **({} if opts.defined_terms else {"defined_terms_detail": []}),
         "repair_queue": [
-            {"kind": "rejected_heading", "locus": r, "evidence": "", "resolution": "open"}
+            {
+                "kind": "rejected_heading",
+                "locus": r,
+                "evidence": "",
+                "resolution": _resolution(r, opts.label_routine_repairs),
+            }
             for r in tree.rejected[:200]
         ]
         + [
@@ -502,9 +520,26 @@ def build_output(doc_id: str, opts: ReadOptions) -> dict:
                 "contract_scheme_detected": bool(sem.get("numbering_scheme")),
                 # つながないときはキーを出さない（従来の出力とバイト単位で同じにする）
                 **({"stitch_tables": True} if opts.stitch_tables else {}),
+                **({"supersede_empty_upper": True} if opts.supersede_empty_upper else {}),
+                **({"filter_figure_regions": True} if opts.filter_figure_regions else {}),
+                **({"label_routine_repairs": True} if opts.label_routine_repairs else {}),
             },
         },
     }
+
+
+# 定型の規則で捨てた見出しの記録（tree.Builder が `p<頁> <理由>: <行>` の形で書く）。目次・柱は版面の作りで毎ページ出るので、
+# 1 文書で数百件になり（h13 の約款 20 文書で 551 件）、確かめるべき項目（番号の再同期・降格など）が埋もれる。
+# "routine" は「規則どおりに捨てた」という意味で、捨てたのが正しいと確かめた印ではない
+ROUTINE_REJECTIONS = ("目次行", "目次ブロックの上位見出し", "柱の上位見出し")
+
+
+def _resolution(locus: str, label_routine: bool) -> str:
+    if label_routine:
+        reason = locus.split(" ", 1)[1].split(":", 1)[0] if " " in locus else ""
+        if reason in ROUTINE_REJECTIONS:
+            return "routine"
+    return "open"
 
 
 def write_output(doc_id: str, opts: ReadOptions) -> str:

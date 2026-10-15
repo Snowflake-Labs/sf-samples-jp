@@ -35,6 +35,14 @@ DPI_SCALE = 150.0 / 72.0
 PAD_PT = {"table": 6.0, "figure": 12.0}
 # これ未満の領域はノイズ（見出しの囲み罫など）として捨てる。
 MIN_W_PT, MIN_H_PT = 40.0, 24.0
+# **図の領域の絞り込み（本ハンズオンで追加・既定 off）。** 領域の中の曲線（curve）がこの範囲なら図ではない。
+# 実測（h13 の 40 文書・220 領域。正解の要素との重なりで種類を決めた）：
+#   正解の図 69 領域   曲線 5〜31 本（最小 5）
+#   署名欄 35・枠囲み 8 曲線 1〜4 本（押印の丸・角の丸め）
+#   表 48・脚注 43 ほか 曲線 0 本
+# 手元の PDF の正解の図 111 件では曲線 0 本が 3 件（罫線だけのマトリクス図 `fig_*_matrix`）、1〜4 本は 0 件。
+# **0 本は外さない**（表・脚注とマトリクス図を見分けられず、図を落とすと辺がすべて失われる）
+FIGURE_FEW_CURVES = (1, 4)
 
 
 @dataclass
@@ -71,7 +79,25 @@ def _clip(bbox: list[float], pad: float, page_w: float, page_h: float) -> list[f
     ]
 
 
-def build_regions(doc_id: str) -> list[Region]:
+def _curve_centers(doc_id: str) -> dict[int, list[tuple[float, float]]]:
+    import pdfplumber
+
+    out: dict[int, list[tuple[float, float]]] = {}
+    with pdfplumber.open(doc_pdf(doc_id)) as pdf:
+        for i, p in enumerate(pdf.pages, start=1):
+            out[i] = [
+                ((c["x0"] + c["x1"]) / 2, (c["top"] + c["bottom"]) / 2) for c in p.curves or []
+            ]
+    return out
+
+
+def few_curves(box: list[float], centers: list[tuple[float, float]]) -> bool:
+    """図の候補の矩形に、中心が入る曲線の数が `FIGURE_FEW_CURVES` の範囲か。"""
+    n = sum(1 for x, y in centers if box[0] <= x <= box[2] and box[1] <= y <= box[3])
+    return FIGURE_FEW_CURVES[0] <= n <= FIGURE_FEW_CURVES[1]
+
+
+def build_regions(doc_id: str, filter_figures: bool = False) -> list[Region]:
     """`geometry` の領域 bbox から単一領域 PNG を切り出す。
 
     `geometry` を先に実行しておく必要がある（`read_pages` が読む）。
@@ -82,6 +108,11 @@ def build_regions(doc_id: str) -> list[Region]:
     下原点」という一般論から y を反転させたが、それは誤りだった。反転しても
     「それらしい表が写った画像」が出てしまうため、**実行では気づけない**種類の
     誤りである（実測で確かめた：gold の表 bbox との IoU が反転で改善しなかった）。
+
+    `filter_figures`（コーパス設定の `figures.filter_regions`）が真なら、曲線の少ない図の候補
+    （`FIGURE_FEW_CURVES`）を図の領域にしない。図の領域ごとに S40 が `AI_COMPLETE` を呼ぶので、
+    呼び出しの数が減る。外した候補も**番号は消費する**（残る図の領域の id・ファイル名を変えないため。
+    S40 のキャッシュはクロップの md5 で引くので、同じ画像なら同じ結果が返る）。
     """
     out: list[Region] = []
     cdir = _crop_dir(doc_id)
@@ -93,6 +124,7 @@ def build_regions(doc_id: str) -> list[Region]:
         old.unlink()
     pages = {p.page: p for p in read_pages(doc_id)}
     pdf = pdfium.PdfDocument(str(doc_pdf(doc_id)))
+    centers = _curve_centers(doc_id) if filter_figures else {}
     for page in sorted(pages):
         g = pages[page]
         img = render_page(pdf, page)
@@ -110,6 +142,9 @@ def build_regions(doc_id: str) -> list[Region]:
                 left, top = max(0, left), max(0, top)
                 right, bottom = min(img.width, right), min(img.height, bottom)
                 if right - left < 8 or bottom - top < 8:
+                    continue
+                if kind == "figure" and filter_figures and few_curves(box, centers.get(page, [])):
+                    idx += 1
                     continue
                 rid = f"{doc_id}#p{page:03d}_{kind[:3]}{idx}"
                 name = f"page-{page:03d}-{kind[:3]}{idx}.png"

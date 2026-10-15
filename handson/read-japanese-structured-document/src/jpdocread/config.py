@@ -90,6 +90,19 @@ class TablesConfig(_Strict):
     stitch: bool = False
 
 
+class FiguresConfig(_Strict):
+    # 曲線の少ない図の候補（署名欄・枠囲み）を図の領域にしないか（read/regions.py の FIGURE_FEW_CURVES）
+    filter_regions: bool = False
+
+
+class StructureConfig(_Strict):
+    # 目次の続きで先に開いた空の特約・別表を、本物の見出しで置き換えるか（read/structure/tree.py の Builder._supersede）
+    supersede_empty_upper: bool = False
+    # repair_queue のうち定型の規則で捨てた見出し（目次の行・目次ブロック・柱）の resolution を "routine" にするか
+    # （read/integrate.py の ROUTINE_REJECTIONS）。False なら従来どおりすべて "open"
+    label_routine_repairs: bool = False
+
+
 class CorpusCostConfig(_Strict):
     figure_regions_per_gold_figure: float = Field(ge=0)
 
@@ -101,6 +114,8 @@ class CorpusConfig(_Strict):
     structure_builder: Literal["auto", "yakkan", "contract"]
     features: FeaturesConfig = FeaturesConfig()
     tables: TablesConfig = TablesConfig()
+    structure: StructureConfig = StructureConfig()
+    figures: FiguresConfig = FiguresConfig()
     figure_shots: list[str]
     eval_excluded: list[str]
     slices: dict[str, list[str]]

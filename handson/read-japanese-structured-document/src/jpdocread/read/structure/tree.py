@@ -90,6 +90,20 @@ RE_APP_SEC_VALUE_TAIL = re.compile(r"[0-9０-９]+(?:[％%]|円|万円)$")
 """
 RE_SECTION = re.compile(r"^第([0-9０-９]+)節[　 ]*(.*)$")
 RE_PART = re.compile(r"^第([0-9０-９]+)編[　 ]*(.*)$")
+APP_SEC_MAX_LEN = 24
+
+
+def _is_app_sec_prose(s: str) -> bool:
+    """別表の節の形をした行が、**表の行か本文**であるか（本ハンズオンで追加。`supersede_empty_upper` のときだけ使う）。
+
+    正解の別表の節の見出し（約款 113 文書・241 件）は最長 16 字で、読点・句点を含むものは 0 件である。
+    表の行は列が連結されて長くなり、文を含む（`第１区分座る、立つ、歩くのいずれについても常に他人の該当する`。
+    group-0004 の別表1）。空の先行容器を置き換えて本物の別表が開くと、この行が節として生えるようになったので、
+    置き換えと同じ設定で弾く。
+    """
+    return len(s) > APP_SEC_MAX_LEN or any(c in s for c in "、。")
+
+
 RE_APP_SEC_EXCLUDE = re.compile(r"^第[0-9０-９]+(?:条|章|節|編|項|号|級)")
 """`RE_APP_SEC` の否定規則（W10）。
 
@@ -419,6 +433,8 @@ class Tree:
     roots: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)  # 見出しに見えたが認めなかった行
     resyncs: list[str] = field(default_factory=list)  # 番号が飛んだが受け入れた箇所
+    # `Builder._supersede` が取り除いた空の先行容器と、その配下（`bodyless_container_cut` が見出し区間に使う）
+    superseded: list[tuple[Node, list[Node]]] = field(default_factory=list)
 
     def add(self, node: Node) -> Node:
         self.nodes[node.node_id] = node
@@ -499,7 +515,10 @@ class Builder:
         heading_allow: set[tuple[int, str]] | None = None,
         region_lines: set[tuple[int, str]] | None = None,
         grammar: str = "yakkan",
+        supersede_empty_upper: bool = False,
     ) -> None:
+        # **空の先行容器を本物の見出しで置き換える（本ハンズオンで追加・既定 off）。** `_supersede` 参照
+        self.supersede_empty_upper = supersede_empty_upper
         # **体裁ごとの見出し文法**（T11/T12）。`yakkan` 以外は `_feed_jyusetsu` へ。
         self.grammar = grammar
         self._expect_item = 1
@@ -573,6 +592,51 @@ class Builder:
             return True
         self._seen.add(full)
         return False
+
+    def _body_chars(self, nid: str) -> int:
+        """配下（自身を除く）の本文の文字数。条・段落・号・別表の節が持つ行を数える。"""
+        return sum(
+            len(self.t.nodes[c].text.strip()) + self._body_chars(c)
+            for c in self.t.nodes[nid].children
+        )
+
+    def _remove_subtree(self, nid: str) -> None:
+        n = self.t.nodes[nid]
+        for c in list(n.children):
+            self._remove_subtree(c)
+        if n.parent_id is None:
+            self.t.roots.remove(nid)
+        else:
+            self.t.nodes[n.parent_id].children.remove(nid)
+        del self.t.nodes[nid]
+
+    def _supersede(self, kind: str, label: str, page: int) -> bool:
+        """同じ特約・別表を既に開いているとき、**先に開いた容器が空なら取り除いて開き直す**。
+
+        目次の続き（見出しと条の題名だけが並ぶ）で特約・別表が先に開くと、本物の見出しは
+        `_dup` に吸収され、配下の条が直前の特約の下に入る（実測：health-0002 は p4 の目次の続きで
+        `骨折治療一時金特約`・`別表1`・`別表2` が開き、p13 の本物の条 8 件が `はればれ退院後通院特約` に付いた）。
+        W17-B（`bodyless_container_cut`）は条を持つ容器だけを見るので、条の題名だけを持つこの形は残る。
+
+        **置き換えるのは、配下に本文が 1 文字も無い容器だけである。** 柱の再出現は
+        いま開いている同名の容器のもとで起きるので、開いている容器と同名なら置き換えない。
+        特約は呼び出し側で「直後に第1条が来る」（`_rider_ok`）を満たしている。
+        """
+        if not self.supersede_empty_upper:
+            return False
+        cur = self.cur[kind]
+        if cur is not None and cur.label == label:
+            return False
+        early = [n for n in self.t.nodes.values() if n.kind == kind and n.label == label]
+        if len(early) != 1 or self._body_chars(early[0].node_id):
+            return False
+        self.t.rejected.append(
+            f"p{page} 空の先行容器を置き換え: {kind} {label}（p{early[0].pages[0]}）"
+        )
+        sub = [self.t.nodes[c] for c in early[0].children]
+        self.t.superseded.append((early[0], sub))
+        self._remove_subtree(early[0].node_id)
+        return True
 
     def _open(self, kind: str, label: str, heading: str, page: int, parent: Node | None) -> Node:
         self.seq += 1
@@ -828,7 +892,7 @@ class Builder:
                 self.t.rejected.append(f"p{page} 参照（別表/付表）: {s[:34]}")
                 self._attach(line, page)
                 return
-            if self._dup(("appendix", label)):
+            if self._dup(("appendix", label)) and not self._supersede("appendix", label, page):
                 self._attach(line, page)
                 return
             self._open("appendix", label, m.group(2), page, None)
@@ -853,7 +917,12 @@ class Builder:
             # 置かれているので、空白必須を外すと `第2章…` を別表の節として食う。
             # 番号の直後に来る構造接尾辞をすべて除外する。
             # **値で終わる行は節ではない（W11 T29）。** `RE_APP_SEC_VALUE_TAIL` 参照。
-            if m and not RE_APP_SEC_EXCLUDE.match(s) and not RE_APP_SEC_VALUE_TAIL.search(s):
+            if (
+                m
+                and not RE_APP_SEC_EXCLUDE.match(s)
+                and not RE_APP_SEC_VALUE_TAIL.search(s)
+                and not (self.supersede_empty_upper and _is_app_sec_prose(s))
+            ):
                 self._open(
                     "appendix_section",
                     f"第{_n(m.group(1))}",
@@ -891,7 +960,7 @@ class Builder:
         if m and self._rider_ok and not any(c in m.group(1) for c in "、。"):
             name = m.group(1)
             # 同じ特約名が連続で現れるのは柱（running head）。木を二重に生やさない。
-            if self._dup(("rider", name)):
+            if self._dup(("rider", name)) and not self._supersede("rider", name, page):
                 self._attach(line, page)
                 return
             # 特約に入ると条番号は 1 から振り直される。**再同期ではなく正常な境界**。
@@ -1317,6 +1386,7 @@ def build_tree(
     grammar: str = "yakkan",
     repair_item_runs: bool = True,
     extra_cut: dict[int, int] | None = None,
+    supersede_empty_upper: bool = False,
 ) -> Tree:
     """`skip_pages` は構造組み立てから外すページ（目次・表紙）。
 
@@ -1331,7 +1401,11 @@ def build_tree(
     """
     keep = {p: t for p, t in pages.items() if p not in (skip_pages or set())}
     tree = Builder(
-        doc_id, heading_allow=heading_allow, region_lines=region_lines, grammar=grammar
+        doc_id,
+        heading_allow=heading_allow,
+        region_lines=region_lines,
+        grammar=grammar,
+        supersede_empty_upper=supersede_empty_upper,
     ).build(keep, toc_pages=toc_pages, extra_cut=extra_cut)
     if repair_item_runs:
         repair_items(tree)
@@ -1409,6 +1483,7 @@ def build_tree_for_doc(
     drop_regions: bool = False,
     suppress_region_items: bool = True,
     builder: str = "auto",
+    supersede_empty_upper: bool = False,
 ) -> Tree:
     """既定の経路：R4 の行を使い、表紙だけページ単位で外す。
 
@@ -1416,6 +1491,9 @@ def build_tree_for_doc(
       auto      … 移植元のまま。印字形から契約書の体裁を判定し、契約書なら契約書の組み立て器、そうでなければ約款の組み立て器
       yakkan    … 判定せず約款の組み立て器で組む
       contract  … 契約書の組み立て器で組む。体裁を判定できなければエラー（黙って約款の経路に回さない）
+
+    `supersede_empty_upper`（本ハンズオンで追加。コーパス設定の `structure.supersede_empty_upper`）：
+    目次の続きで先に開いた空の特約・別表を、本物の見出しで置き換える（`Builder._supersede`）。既定 off
 
     目次は**行単位**で落とす（`RE_TOC_ENTRY`）。ページ単位で落とすと、
     目次と本文が同居するページで本文まで失う。
@@ -1503,6 +1581,7 @@ def build_tree_for_doc(
         toc_pages=set(_toc_suppress_pages(doc_id)),
         region_lines=_region_lines(doc_id) if suppress_region_items else None,
         grammar=infer_grammar([ln for t in pg.values() for ln in t.split("\n")]),
+        supersede_empty_upper=supersede_empty_upper,
     )
     tree = build_tree(doc_id, pg, heading_allow=allow, extra_cut=split_cut, **kw)
     # **W17-B：本文を持たない容器は見出し列の続きである（4 経路の共有抑止）。**
@@ -1546,13 +1625,20 @@ def bodyless_container_cut(tree: Tree, pages: dict[int, str]) -> dict[int, int]:
         return own + sum(body(c) for c in n.children)
 
     rows = {pg: [x.strip() for x in t.split("\n")] for pg, t in pages.items()}
-    out: dict[int, int] = {}
+    cands: list[tuple[Node, list[Node]]] = []
     for nid, n in tree.nodes.items():
         if n.kind not in ("rider", "chapter", "section", "part", "appendix") or not n.pages:
             continue
         arts = [tree.nodes[c] for c in n.children if tree.nodes[c].kind == ARTICLE_KIND]
         if not arts or body(nid):
             continue
+        cands.append((n, arts))
+    # `Builder._supersede` で取り除いた空の先行容器も同じ見出し区間とみなす（本文が無いことは取り除く前に確かめた）。
+    # 取り除いただけだと 2 回目の組み立てで区間が抑止されず、区間内の目次の行（`第11条（準拠法…）`）が
+    # 根の条として生えた（golf-0001-a4）
+    cands += [(n, sub) for n, sub in tree.superseded if n.pages]
+    out: dict[int, int] = {}
+    for n, arts in cands:
         pg = n.pages[0]
         lines = rows.get(pg) or []
         idx = [j for j, r in enumerate(lines) if r == n.heading_line]

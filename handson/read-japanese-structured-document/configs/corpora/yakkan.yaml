@@ -45,6 +45,18 @@ slices:
 tables:
   stitch: true
 
+# 構造の読み取りの規則（read/structure/tree.py。H14）。false なら従来どおり。
+#   supersede_empty_upper：目次の続きで先に開いた空の特約・別表を、本物の見出しで置き換える
+#   label_routine_repairs：repair_queue のうち目次・柱を規則どおり捨てた記録を resolution "routine" にする
+structure:
+  supersede_empty_upper: true
+  label_routine_repairs: true
+
+# 図の領域の絞り込み（read/regions.py。H14）。曲線が 1〜4 本の候補（署名欄・枠囲み）を図の領域にしない。
+# 図の領域ごとに AI_COMPLETE を呼ぶので、呼び出しの数が減る。false なら従来どおり
+figures:
+  filter_regions: true
+
 # 見込みクレジットの係数：正解の図 1 つあたりに検出される図領域の数
 # 移植元の実測（約款 41 文書の時点で 321 領域 / 117 図）
 cost:

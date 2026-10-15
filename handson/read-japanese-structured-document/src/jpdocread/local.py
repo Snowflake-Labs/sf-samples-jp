@@ -28,7 +28,8 @@ from .worker import run_worker
 CONTRACT_ONLY_KEYS = ("numbering_scheme", "parties", "defined_terms_detail")
 
 
-def new_run_id(prefix: str = "local") -> str:
+def new_local_run_id(prefix: str = "local") -> str:
+    """ローカル実行の run_id（`<prefix>-<UTC 日時>`）。Snowflake の run の `run.new_run_id` とは形式が違う。"""
     return f"{prefix}-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
 
 
@@ -62,13 +63,17 @@ def predict_view(dataset_dir: Path, doc_ids: list[str], dest: Path) -> Path:
 
 
 def read_options(corpus: CorpusConfig) -> dict:
-    return {
-        "structure_builder": corpus.structure_builder,
-        "parties": corpus.features.parties,
-        "defined_terms": corpus.features.defined_terms,
-        "stitch_tables": corpus.tables.stitch,
-        "known_limits": dict(corpus.known_limits),
-    }
+    """ワーカーに渡す読み取りの設定（`ReadOptions` の各フィールド）。
+
+    対応づけは `ReadOptions.from_corpus` の 1 か所だけに置く。ここで同じキーを並べ直すと、キーを足したときに
+    ローカル読み取りだけ既定値で動く。import を関数の中に置くのは、CLI の起動で読み取りの依存（pdfplumber 等）を読まないため
+    """
+    from dataclasses import fields
+
+    from .read.integrate import ReadOptions
+
+    o = ReadOptions.from_corpus(corpus)
+    return {f.name: getattr(o, f.name) for f in fields(o)}
 
 
 def local_read(

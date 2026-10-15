@@ -107,10 +107,10 @@ def _select_kwargs(args: argparse.Namespace) -> dict:
 
 
 def cmd_local_read(args: argparse.Namespace) -> int:
-    from .local import local_read, new_run_id
+    from .local import local_read, new_local_run_id
 
     corpus = load_corpus_config(args.corpus)
-    run_id = args.run_id or new_run_id()
+    run_id = args.run_id or new_local_run_id()
     summary = local_read(
         make_source(corpus),
         corpus,
@@ -141,10 +141,10 @@ def cmd_local_read(args: argparse.Namespace) -> int:
 
 
 def cmd_eval(args: argparse.Namespace) -> int:
-    from .local import local_eval, new_run_id
+    from .local import local_eval, new_local_run_id
 
     corpus = load_corpus_config(args.corpus)
-    run_id = args.run_id or new_run_id("eval")
+    run_id = args.run_id or new_local_run_id("eval")
     record = local_eval(
         make_source(corpus),
         corpus,

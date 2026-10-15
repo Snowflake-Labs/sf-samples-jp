@@ -88,15 +88,21 @@ def _task_read(args: dict) -> dict:
     from .read.regions import build_regions
 
     opts = integrate.ReadOptions(**args["options"])
+
+    def read_one(doc_id: str) -> dict:
+        """1 文書を S30（幾何・領域）→ S50（統合）の順に読む。AI は呼ばない（LAYOUT は渡された run から写す）"""
+        _, n_pages = write_geometry(doc_id)
+        layout = _seed_layout(doc_id, n_pages, args.get("layout_from"))
+        build_regions(doc_id, filter_figures=opts.filter_figure_regions)
+        figures_for_doc(doc_id)
+        out = integrate.build_output(doc_id, opts)
+        out["provenance"]["local"] = {"layout": layout, "ai_called": False}
+        return out
+
     done, errors = [], {}
     for doc_id in args["doc_ids"]:
         try:
-            _, n_pages = write_geometry(doc_id)
-            layout = _seed_layout(doc_id, n_pages, args.get("layout_from"))
-            build_regions(doc_id)
-            figures_for_doc(doc_id)
-            out = integrate.build_output(doc_id, opts)
-            out["provenance"]["local"] = {"layout": layout, "ai_called": False}
+            out = read_one(doc_id)
             (OUT / f"{doc_id}.json").write_text(
                 json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8"
             )
