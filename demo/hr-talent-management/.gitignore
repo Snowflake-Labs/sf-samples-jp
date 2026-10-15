@@ -1,0 +1,26 @@
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+
+# Snowflake connection config
+.snowflake/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.pkl
+
+# Node
+node_modules/
+
+# Test / build artifacts
+**/test-results/
+**/playwright-report/
+
+# The repo root ignores *.json; these are required to build the app
+!hr-app-v2/package.json
+!hr-app-v2/package-lock.json
+!hr-app-v2/components.json
+!hr-app-v2/tsconfig.json
