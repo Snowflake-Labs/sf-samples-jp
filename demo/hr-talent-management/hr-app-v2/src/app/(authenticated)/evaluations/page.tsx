@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { ChevronDown, ExternalLink, Search, Plus, ClipboardEdit, Pencil, X, Save, Loader2, CheckCircle2, XCircle, SendHorizonal } from "lucide-react";
 import { useHonbu } from "@/lib/honbu-context";
-import { AiScoringPanel, useAiDetail } from "@/components/evaluation/ai-scoring-panel";
+import { AiScoringPanel, GradeTrail, useAiDetail } from "@/components/evaluation/ai-scoring-panel";
 import { MIN_REASON_LENGTH } from "@/lib/manager-override";
 import type { Department } from "@/lib/types";
 
@@ -461,7 +461,7 @@ export default function EvaluationsPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">スコア (1.0〜5.0)</p>
+                      <p className="text-xs text-muted-foreground">上長入力スコア (1.0〜5.0)</p>
                       <Input
                         type="number"
                         min={1}
@@ -534,16 +534,25 @@ export default function EvaluationsPage() {
                       保存
                     </Button>
                   </div>
+                  <Separator />
+                  <GradeTrail finalGrade={editForm.grade || null} detail={ai.detail} />
+                  <AiScoringPanel
+                    evaluationId={selectedEval.EVALUATION_ID}
+                    hasComment={!!selectedEval.COMMENT?.trim()}
+                    detail={ai.detail}
+                    error={ai.error}
+                    onChanged={ai.reload}
+                  />
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">スコア</p>
+                      <p className="text-xs text-muted-foreground">上長入力スコア</p>
                       <p className="text-2xl font-bold font-mono">{selectedEval.SCORE != null ? Number(selectedEval.SCORE).toFixed(1) : '—'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">グレード</p>
+                      <p className="text-xs text-muted-foreground">最終グレード</p>
                       <Badge
                         className="mt-1"
                         variant={selectedEval.GRADE === "S" ? "destructive" : selectedEval.GRADE === "A" ? "default" : "secondary"}
@@ -565,6 +574,8 @@ export default function EvaluationsPage() {
                       {selectedEval.COMMENT || "コメントなし"}
                     </p>
                   </div>
+
+                  <GradeTrail finalGrade={selectedEval.GRADE} detail={ai.detail} />
 
                   {ai.detail?.gradeReason && (
                     <p className="text-xs">

@@ -16,6 +16,40 @@ export interface AiDetail {
   expectationGap: number | null;
   allowedGrades: string[];
   gradeReason: string | null;
+  calibration: { grade: string | null; reason: string; sessionName: string; finalized: boolean } | null;
+}
+
+/**
+ * AI recommendation → calibration-meeting adjustment → final grade, side by side,
+ * so a difference from the 評価調整会議 screen is visible where it comes from.
+ */
+export function GradeTrail({ finalGrade, detail }: { finalGrade: string | null; detail: AiDetail | null }) {
+  const cal = detail?.calibration;
+  const steps = [
+    { label: "AI推奨", value: detail?.standardGrade ?? null, note: detail?.scored ? null : "未採点" },
+    { label: "調整会議", value: cal?.grade ?? null, note: cal ? `${cal.sessionName}${cal.finalized ? "" : "（未確定）"}` : "調整なし" },
+    { label: "最終グレード", value: finalGrade, note: null },
+  ];
+  return (
+    <div className="space-y-1">
+      <div className="grid grid-cols-3 gap-2">
+        {steps.map((s) => (
+          <div key={s.label} className="rounded-md border p-2">
+            <p className="text-[10px] text-muted-foreground">{s.label}</p>
+            <p className="font-mono font-semibold">{s.value ?? "—"}</p>
+            {s.note && <p className="text-[10px] text-muted-foreground truncate">{s.note}</p>}
+          </div>
+        ))}
+      </div>
+      {cal?.reason && <p className="text-xs">調整理由: <span className="text-muted-foreground">{cal.reason}</span></p>}
+      {cal?.grade && finalGrade && cal.grade !== finalGrade && (
+        <p className="text-xs flex items-start gap-1.5 text-amber-700 bg-amber-50 rounded p-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          最終グレードが調整会議の結果（{cal.grade}）と違います。
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Load the AI scoring for one evaluation; reload() after anything that changes it. */

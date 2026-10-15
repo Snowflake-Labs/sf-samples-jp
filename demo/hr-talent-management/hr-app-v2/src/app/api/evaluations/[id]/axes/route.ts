@@ -22,12 +22,25 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       [id]
     );
     if (!ev) return NextResponse.json({ error: "評価が見つかりません" }, { status: 404 });
+    // The latest calibration-meeting adjustment, so the detail shows what the meeting decided.
+    const [cal] = await pgQuery<{ GRADE: string | null; REASON: string; SESSION_NAME: string; STATUS: string }>(
+      `SELECT ca.after_grade AS "GRADE", ca.reason AS "REASON",
+         cs.session_name AS "SESSION_NAME", cs.status AS "STATUS"
+       FROM hr.calibration_adjustments ca
+       JOIN hr.calibration_sessions cs ON cs.session_id = ca.session_id
+       WHERE ca.evaluation_id = $1
+       ORDER BY ca.created_at DESC LIMIT 1`,
+      [id]
+    );
     const axes = await loadAxes(id);
     const scored = axes.axes.every((a) => a.effective !== null);
     return NextResponse.json({
       ...axes,
       scored,
       gradeReason: ev.GRADE_REASON,
+      calibration: cal
+        ? { grade: cal.GRADE, reason: cal.REASON, sessionName: cal.SESSION_NAME, finalized: cal.STATUS === "finalized" }
+        : null,
       // Scored from a different comment than the one saved now.
       stale: scored && axes.aiInputComment !== null && (axes.aiInputComment ?? "") !== (ev.COMMENT ?? ""),
       allowedGrades: axes.standardGrade ? allowedGrades(axes.standardGrade) : [],
