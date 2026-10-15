@@ -222,7 +222,8 @@ export default function CalibrationPage() {
       if (!res.ok) throw new Error(data.error || "更新に失敗しました");
       await openDetail(detail.session.SESSION_ID);
       await loadList();
-      setMessage(`ステータスを「${STATUS_LABELS[status]}」に変更しました`);
+      setMessage(`ステータスを「${STATUS_LABELS[status]}」に変更しました`
+        + (data.written_back ? `（調整後のグレード ${data.written_back} 件を評価の最終グレードに反映しました）` : ""));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -407,7 +408,7 @@ export default function CalibrationPage() {
       {locked && (
         <div className="flex items-start gap-2 rounded-md border bg-muted/50 p-3 text-sm">
           <Lock className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-          <span>この調整会議は確定済みです。これ以上の変更はできません。</span>
+          <span>この調整会議は確定済みです。調整後のグレードは評価の最終グレードに反映済みで、これ以上の変更はできません。</span>
         </div>
       )}
 

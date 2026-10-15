@@ -197,18 +197,37 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
       return NextResponse.json({ error: "status が不正です" }, { status: 400 });
     }
 
-    await pgQuery(
-      `UPDATE hr.calibration_sessions SET
-         status = COALESCE($2, status),
-         notes = COALESCE($3, notes),
-         target_distribution = COALESCE($4::jsonb, target_distribution),
-         finalized_at = CASE WHEN $2 = 'finalized' THEN NOW() ELSE finalized_at END
-       WHERE session_id = $1`,
+    // 確定時は、会議で調整したグレード（評価ごとに最新の 1 件）を評価の最終グレードに書き戻す。
+    // 会議の更新と同じ 1 文にして、片方だけ反映されることがないようにする
+    const [{ written_back }] = await pgQuery<{ written_back: number }>(
+      `WITH upd AS (
+         UPDATE hr.calibration_sessions SET
+           status = COALESCE($2, status),
+           notes = COALESCE($3, notes),
+           target_distribution = COALESCE($4::jsonb, target_distribution),
+           finalized_at = CASE WHEN $2 = 'finalized' THEN NOW() ELSE finalized_at END
+         WHERE session_id = $1
+         RETURNING session_id
+       ),
+       latest AS (
+         SELECT DISTINCT ON (evaluation_id) evaluation_id, after_grade
+         FROM hr.calibration_adjustments
+         WHERE session_id = $1 AND $2 = 'finalized'
+         ORDER BY evaluation_id, created_at DESC
+       ),
+       wb AS (
+         UPDATE hr.evaluations ev SET grade = latest.after_grade, updated_at = NOW()
+         FROM latest
+         WHERE ev.evaluation_id = latest.evaluation_id AND ev.grade IS DISTINCT FROM latest.after_grade
+         RETURNING ev.evaluation_id
+       )
+       SELECT (SELECT COUNT(*) FROM wb)::int AS written_back`,
       [sessionId, status ?? null, notes ?? null, target_distribution ? JSON.stringify(target_distribution) : null]
     );
 
-    console.log(`[calibration] ${user.username} updated session ${sessionId}` + (status ? ` -> ${status}` : ""));
-    return NextResponse.json({ ok: true });
+    console.log(`[calibration] ${user.username} updated session ${sessionId}` + (status ? ` -> ${status}` : "")
+      + (written_back ? ` (wrote back ${written_back} grades)` : ""));
+    return NextResponse.json({ ok: true, written_back });
   } catch (error) {
     console.error("Calibration PATCH error:", error);
     return NextResponse.json({ error: "調整会議の更新に失敗しました" }, { status: 500 });
