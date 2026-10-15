@@ -119,6 +119,11 @@ export async function POST(request: Request) {
         },
         standards
       );
+      // Remember what the AI read, so an edited comment can be flagged as needing a re-score.
+      await pgQuery(
+        `UPDATE hr.eval_quantified_scores SET ai_input_comment = $2 WHERE evaluation_id = $1`,
+        [ev.EVALUATION_ID, ev.COMMENT]
+      );
 
       results.push({
         evaluation_id: ev.EVALUATION_ID,

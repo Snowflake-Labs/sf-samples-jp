@@ -35,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { ChevronDown, ExternalLink, Search, Plus, ClipboardEdit, Pencil, X, Save, Loader2, CheckCircle2, XCircle, SendHorizonal } from "lucide-react";
 import { useHonbu } from "@/lib/honbu-context";
+import { AiScoringPanel, useAiDetail } from "@/components/evaluation/ai-scoring-panel";
+import { MIN_REASON_LENGTH } from "@/lib/manager-override";
 import type { Department } from "@/lib/types";
 
 interface EvalRow {
@@ -50,6 +52,7 @@ interface EvalRow {
   DEPT_NAME: string;
   POSITION_TITLE: string;
   EVALUATOR_NAME: string;
+  RETURN_REASON?: string | null;
 }
 
 function generatePeriods(): string[] {
@@ -68,6 +71,21 @@ function generatePeriods(): string[] {
 const PERIODS = generatePeriods();
 const GRADES = ["S", "A", "B", "C", "D"];
 const PAGE_SIZE = 50;
+
+/** Status label and color, shared by the list and the detail. */
+const STATUS_VIEW: Record<string, { label: string; cls: string }> = {
+  draft: { label: "下書き", cls: "" },
+  pending: { label: "承認待ち", cls: "border-yellow-500 text-yellow-700 bg-yellow-50" },
+  submitted: { label: "上長提出済", cls: "border-blue-500 text-blue-700 bg-blue-50" },
+  approved: { label: "承認済", cls: "border-green-500 text-green-700 bg-green-50" },
+  confirmed: { label: "確定", cls: "border-green-500 text-green-700 bg-green-50" },
+  rejected: { label: "差戻し", cls: "border-red-500 text-red-700 bg-red-50" },
+};
+function statusView(ev: { STATUS: string; RETURN_REASON?: string | null }) {
+  // A review HR sent back to the line manager is a draft with a return reason.
+  if (ev.STATUS === "draft" && ev.RETURN_REASON) return STATUS_VIEW.rejected;
+  return STATUS_VIEW[ev.STATUS] ?? STATUS_VIEW.draft;
+}
 
 function autoGrade(s: number): string {
   if (s >= 4.5) return "S";
@@ -99,7 +117,11 @@ export default function EvaluationsPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [opError, setOpError] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ score: "", grade: "", comment: "", status: "" });
+  const [editForm, setEditForm] = useState({ score: "", grade: "", gradeReason: "", comment: "", status: "" });
+  const ai = useAiDetail(modalOpen && selectedEval ? selectedEval.EVALUATION_ID : null);
+  const recommended = ai.detail?.scored ? ai.detail.standardGrade : null;
+  const gradeChoices = recommended && ai.detail ? ai.detail.allowedGrades : GRADES;
+  const gradeNeedsReason = !!recommended && !!editForm.grade && editForm.grade !== recommended;
 
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -170,6 +192,7 @@ export default function EvaluationsPage() {
     setEditForm({
       score: ev.SCORE != null ? String(Number(ev.SCORE)) : "",
       grade: ev.GRADE || "",
+      gradeReason: "",
       comment: ev.COMMENT || "",
       status: ev.STATUS || "draft",
     });
@@ -181,6 +204,7 @@ export default function EvaluationsPage() {
     setEditForm({
       score: selectedEval.SCORE != null ? String(Number(selectedEval.SCORE)) : "",
       grade: selectedEval.GRADE || "",
+      gradeReason: ai.detail?.gradeReason || "",
       comment: selectedEval.COMMENT || "",
       status: selectedEval.STATUS || "draft",
     });
@@ -190,6 +214,7 @@ export default function EvaluationsPage() {
   const handleScoreChange = (val: string) => {
     setEditForm((prev) => {
       const n = parseFloat(val);
+      if (recommended) return { ...prev, score: val };
       return { ...prev, score: val, grade: !isNaN(n) && n >= 1 && n <= 5 ? autoGrade(n) : prev.grade };
     });
   };
@@ -197,10 +222,14 @@ export default function EvaluationsPage() {
   const saveEdit = async () => {
     if (!selectedEval) return;
     setSaving(true);
+    setOpError(null);
     try {
       const body: Record<string, unknown> = {};
       if (editForm.score) body.SCORE = parseFloat(editForm.score);
-      if (editForm.grade) body.GRADE = editForm.grade;
+      if (editForm.grade) {
+        body.GRADE = editForm.grade;
+        body.GRADE_REASON = gradeNeedsReason ? editForm.gradeReason.trim() : null;
+      }
       body.COMMENT = editForm.comment;
       body.STATUS = editForm.status;
       const res = await fetch(`/api/evaluations/${selectedEval.EVALUATION_ID}`, {
@@ -208,7 +237,10 @@ export default function EvaluationsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "更新に失敗しました");
+      }
       const updated = {
         ...selectedEval,
         SCORE: body.SCORE != null ? Number(body.SCORE) : selectedEval.SCORE,
@@ -221,8 +253,9 @@ export default function EvaluationsPage() {
         prev.map((e) => e.EVALUATION_ID === selectedEval.EVALUATION_ID ? { ...e, ...updated } : e)
       );
       setEditing(false);
-    } catch {
-      setOpError("更新に失敗しました");
+      ai.reload();
+    } catch (e) {
+      setOpError((e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -376,13 +409,8 @@ export default function EvaluationsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`text-[10px] ${
-                          ev.STATUS === "approved" ? "border-green-500 text-green-700 bg-green-50" :
-                          ev.STATUS === "pending" ? "border-yellow-500 text-yellow-700 bg-yellow-50" :
-                          ev.STATUS === "rejected" ? "border-red-500 text-red-700 bg-red-50" :
-                          ev.STATUS === "confirmed" ? "border-green-500 text-green-700 bg-green-50" : ""
-                        }`}>
-                          {ev.STATUS === "approved" ? "承認済" : ev.STATUS === "pending" ? "承認待ち" : ev.STATUS === "rejected" ? "差戻し" : ev.STATUS === "confirmed" ? "確定" : "下書き"}
+                        <Badge variant="outline" className={`text-[10px] ${statusView(ev).cls}`}>
+                          {statusView(ev).label}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
@@ -411,15 +439,16 @@ export default function EvaluationsPage() {
       </Card>
 
       <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setEditing(false); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedEval && (
             <>
-              <DialogHeader>
+              <DialogHeader className="pr-10">
                 <DialogTitle className="flex items-center gap-2">
                   {selectedEval.EMPLOYEE_NAME} の評価詳細
                   {!editing && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={startEditing}>
+                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={startEditing}>
                       <Pencil className="h-3.5 w-3.5" />
+                      編集
                     </Button>
                   )}
                 </DialogTitle>
@@ -444,19 +473,31 @@ export default function EvaluationsPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">グレード</p>
+                      <p className="text-xs text-muted-foreground">
+                        最終グレード{recommended ? `（AI推奨 ${recommended}・前後1段階まで）` : ""}
+                      </p>
                       <Select value={editForm.grade} onValueChange={(v) => setEditForm((f) => ({ ...f, grade: v || "" }))}>
                         <SelectTrigger className="h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {GRADES.map((g) => (
-                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          {gradeChoices.map((g) => (
+                            <SelectItem key={g} value={g}>{g}{g === recommended ? "（推奨）" : ""}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
+                  {gradeNeedsReason && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">推奨 {recommended} から変える理由（{MIN_REASON_LENGTH}文字以上・必須）</p>
+                      <Input
+                        value={editForm.gradeReason}
+                        onChange={(e) => setEditForm((f) => ({ ...f, gradeReason: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">コメント</p>
                     <Textarea
@@ -480,12 +521,15 @@ export default function EvaluationsPage() {
                       </Button>
                     </div>
                   </div>
+                  {opError && <p className="text-xs text-destructive">{opError}</p>}
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" size="sm" onClick={() => setEditing(false)} className="gap-1.5">
                       <X className="h-3.5 w-3.5" />
                       キャンセル
                     </Button>
-                    <Button size="sm" onClick={saveEdit} disabled={saving} className="gap-1.5">
+                    <Button size="sm" onClick={saveEdit}
+                      disabled={saving || (gradeNeedsReason && editForm.gradeReason.trim().length < MIN_REASON_LENGTH)}
+                      className="gap-1.5">
                       {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                       保存
                     </Button>
@@ -521,6 +565,21 @@ export default function EvaluationsPage() {
                       {selectedEval.COMMENT || "コメントなし"}
                     </p>
                   </div>
+
+                  {ai.detail?.gradeReason && (
+                    <p className="text-xs">
+                      最終グレード <b>{selectedEval.GRADE}</b>（推奨 {ai.detail.standardGrade} から変更）:
+                      <span className="text-muted-foreground"> {ai.detail.gradeReason}</span>
+                    </p>
+                  )}
+
+                  <AiScoringPanel
+                    evaluationId={selectedEval.EVALUATION_ID}
+                    hasComment={!!selectedEval.COMMENT?.trim()}
+                    detail={ai.detail}
+                    error={ai.error}
+                    onChanged={ai.reload}
+                  />
 
                   <Separator />
 

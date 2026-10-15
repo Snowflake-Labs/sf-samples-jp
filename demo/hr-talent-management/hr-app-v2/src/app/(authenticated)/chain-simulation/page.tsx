@@ -24,6 +24,7 @@ import {
   Undo2, X, Sparkles, FolderOpen, Send, Archive,
 } from "lucide-react";
 import Link from "next/link";
+import { TransferModeHint } from "@/components/transfer-mode-hint";
 import { useSearchParams } from "next/navigation";
 import { GRADE_LABELS } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -486,6 +487,7 @@ function ChainSimulationPageInner() {
           </Button>
         </div>
       </div>
+      <TransferModeHint current="chain" />
 
       {loadedSimId && loadedSimStatus && (
         <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border text-sm ${

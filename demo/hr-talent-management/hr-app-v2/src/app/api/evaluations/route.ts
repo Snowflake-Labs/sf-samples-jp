@@ -71,7 +71,7 @@ export async function GET(request: Request) {
 
     const dataSql = `
       SELECT ev.evaluation_id AS "EVALUATION_ID", ev.employee_id AS "EMPLOYEE_ID",
-        ev.period AS "PERIOD", ev.score AS "SCORE", ev.grade AS "GRADE", ev.status AS "STATUS",
+        ev.period AS "PERIOD", ev.score AS "SCORE", ev.grade AS "GRADE", ev.status AS "STATUS", ev.return_reason AS "RETURN_REASON",
         SUBSTR(ev.comment, 1, 100) AS "COMMENT",
         e.last_name || e.first_name AS "EMPLOYEE_NAME",
         e.employee_code AS "EMPLOYEE_CODE",

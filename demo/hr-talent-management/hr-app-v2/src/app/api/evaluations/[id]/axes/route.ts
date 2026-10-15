@@ -2,9 +2,41 @@ import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { getSession, requireRole } from "@/lib/session";
 import { aiScoresOf, loadAxes } from "@/lib/my-team";
-import { applyAxisInputs, type AxisInputs } from "@/lib/manager-override";
+import { allowedGrades, applyAxisInputs, type AxisInputs } from "@/lib/manager-override";
 import { rerankPeriod, saveScores } from "@/lib/recalculate";
 import { SCORE_AXES } from "@/lib/scoring";
+
+/**
+ * The AI axis scores, corrections and recommendation for one evaluation,
+ * for HR's detail view on 評価管理.
+ */
+export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  const auth = requireRole(session, ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
+  const id = Number((await ctx.params).id);
+  if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  try {
+    const [ev] = await pgQuery<{ COMMENT: string | null; GRADE_REASON: string | null }>(
+      `SELECT comment AS "COMMENT", grade_reason AS "GRADE_REASON" FROM hr.evaluations WHERE evaluation_id = $1`,
+      [id]
+    );
+    if (!ev) return NextResponse.json({ error: "評価が見つかりません" }, { status: 404 });
+    const axes = await loadAxes(id);
+    const scored = axes.axes.every((a) => a.effective !== null);
+    return NextResponse.json({
+      ...axes,
+      scored,
+      gradeReason: ev.GRADE_REASON,
+      // Scored from a different comment than the one saved now.
+      stale: scored && axes.aiInputComment !== null && (axes.aiInputComment ?? "") !== (ev.COMMENT ?? ""),
+      allowedGrades: axes.standardGrade ? allowedGrades(axes.standardGrade) : [],
+    });
+  } catch (error) {
+    console.error("evaluation axes error:", error);
+    return NextResponse.json({ error: "AI採点の取得に失敗しました" }, { status: 500 });
+  }
+}
 
 /**
  * HR corrects the 5 axis scores from the cross-review screen.

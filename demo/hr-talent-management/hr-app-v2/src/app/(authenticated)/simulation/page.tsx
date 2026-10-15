@@ -64,6 +64,7 @@ import {
   CircleDashed,
 } from "lucide-react";
 import Link from "next/link";
+import { TransferModeHint } from "@/components/transfer-mode-hint";
 import { useSearchParams } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
@@ -969,6 +970,7 @@ function SimulationPageInner() {
           )}
         </div>
       </div>
+      <TransferModeHint current="scenario" />
 
       {incomingContext && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-red-200 bg-red-50/60 text-sm shrink-0">
