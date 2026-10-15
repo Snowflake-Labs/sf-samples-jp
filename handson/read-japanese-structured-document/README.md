@@ -275,7 +275,7 @@ flowchart LR
 最後に、作成したオブジェクトの件数（データベース 2、ロール 3、ウェアハウス 1、コンピュートプール 1）と `setup 完了` が表示されます。
 setup は繰り返し実行しても同じ状態になります。2 回目以降は `scripts/setup.sh --skip-build` を使うと、イメージのビルドを省略できます。
 
-![img](imgs/screenshot_0.png)
+![setup で作成されたデータベースとスキーマ（カタログ）](imgs/screenshot_0.png)
 
 > 取得時に Hugging Face から「unauthenticated requests」という警告が表示されることがあります。このハンズオンでは公開データセットを匿名で取得するため、問題ありません。
 
@@ -315,9 +315,9 @@ flowchart LR
 数字は処理した文書数です。`✓` は成功、`…` は実行中、`✗` は失敗を表します。
 S10・S30 が 3 件なのは、図の読み取りで正解例として使う文書 2 件も処理するためです。これら 2 件は評価対象に含めません。
 
-![img](imgs/screenshot_1.png)
+![Task の実行履歴（S00〜S70 がすべて成功）](imgs/screenshot_1.png)
 
-![img](imgs/screenshot_0.1.png)
+![Task グラフの実行結果](imgs/screenshot_0.1.png)
 
 5 分ほどで完了し、次のような要約が表示されます。以下は実行例です。
 
@@ -370,7 +370,7 @@ flowchart LR
 - **中間成果物の受け渡し：** ステップの間はステージとキャッシュ表だけで受け渡します。途中で失敗しても、成功したステップの結果を使って再開できます（§9）。
 - **正解は使わない：** 読み取り（S10〜S55）は `doc.pdf` と自分の run の中間成果物だけを読みます。正解は評価（S60）のときに、評価ロールだけが読みます。
 
-![img](imgs/screenshot_2.png)
+![S30・S50・S60 の SPCS ジョブの一覧](imgs/screenshot_2.png)
 
 ---
 
@@ -465,7 +465,7 @@ FROM JA_DOC_STRUCTURED_DB.JA_DOC_STRUCTURED_OUTPUT.PARTIES
 WHERE run_id = $run_id;
 ```
 
-![img](imgs/screenshot_3.png)
+![引用パスで条項を取得する照会と、第4条を参照している条項の照会の結果](imgs/screenshot_3.png)
 
 ほかに「定義語の定義箇所と使用数」「参照の解決率」があります。
 
@@ -521,7 +521,7 @@ FROM JA_DOC_STRUCTURED_EVAL_DB.JA_DOC_STRUCTURED_RESULTS.V_RUN_SUMMARY;
 
 文書ごとの値は `V_DOC`、ページごとの値は `V_PAGE` で確認できます。
 
-![img](imgs/screenshot_4.png)
+![評価ロールで実行した V_RUN_SUMMARY の結果](imgs/screenshot_4.png)
 
 
 ---
@@ -659,7 +659,7 @@ docker rmi $(docker images -q jpdocread | sort -u)  # ビルドしたイメー�
   WHERE run_id = $run_id AND fragments IS NOT NULL;
   ```
 
-![img](imgs/screenshot_5.png)
+![ページをまたいでつないだ表の照会結果](imgs/screenshot_5.png)
 
 ### 11.2 幾何と図：pdfplumber と `AI_COMPLETE`（S30・S40）
 
