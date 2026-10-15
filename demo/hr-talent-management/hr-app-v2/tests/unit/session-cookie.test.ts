@@ -77,4 +77,10 @@ describe("session cookie sign/verify", () => {
     cookieStore.value = "not-a-valid-cookie";
     expect(await getSession()).toBeNull();
   });
+
+  it("rejects an unsigned JSON cookie", async () => {
+    const { getSession } = await import("@/lib/session");
+    cookieStore.value = JSON.stringify({ ...session, role: "HR_ADMIN" });
+    expect(await getSession()).toBeNull();
+  });
 });

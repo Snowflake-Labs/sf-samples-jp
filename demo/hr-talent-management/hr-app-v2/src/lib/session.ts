@@ -48,13 +48,8 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!cookie?.value) return null;
 
   const parts = cookie.value.split(".");
-  if (parts.length !== 2) {
-    try {
-      return JSON.parse(cookie.value) as SessionUser;
-    } catch {
-      return null;
-    }
-  }
+  // 署名のない cookie は受け付けない（書き換えるだけで任意のロールになれてしまう）
+  if (parts.length !== 2) return null;
 
   const [b64, sig] = parts;
   let payload: string;
