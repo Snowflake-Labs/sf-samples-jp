@@ -118,7 +118,8 @@ session.sql("DELETE FROM SHAP_RESULTS").collect()
 SHAP_SAMPLE_SIZE = 2000
 
 print("  Computing attrition SHAP (Warehouse)...")
-att_result = session.sql(f"CALL HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION({SHAP_SAMPLE_SIZE}, '{VERSION}')").collect()
+# 離職予測は全員分（0）。主要因を CSV・詳細画面で全員に出すため
+att_result = session.sql(f"CALL HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION(0, '{VERSION}')").collect()
 print(f"    {att_result[0][0]}")
 
 print("  Computing relationship SHAP (Warehouse)...")

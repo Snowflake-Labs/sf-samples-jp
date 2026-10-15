@@ -88,6 +88,7 @@ Next.js App (hr-app-v2/)  ←  Snowflake App Runtime でホスティング
 │   ├── ml_pipeline_v3.py  # MLパイプライン (Feature Store + Model Registry)
 │   ├── ml_reinference.py          # 再推論 (学習スキップ)
 │   ├── register_shap_sproc.py     # SHAP Stored Procedure 登録
+│   ├── sync_ml_to_pg_lake.py      # ML 結果 → Postgres hr_lake（任意、pg_lake 利用時）
 │   ├── add_transfer_fit_fv.py     # Feature Store 追加設定
 │   ├── create_semantic_view.py    # Semantic View 作成（YAML から）
 │   ├── setup_score_standards.js   # 評価基準（期待水準・重み）の初期値投入
@@ -220,9 +221,20 @@ snow app deploy --target v3 --connection $SNOWFLAKE_CONNECTION_NAME
 ローカルで動かす場合は `hr-app-v2/README.md` を参照してください（Snowflake への接続に PAT が必要です）。
 
 > **データの読み取り経路について**
-> アプリは既定で、Postgres の `hr_lake` スキーマ（pg_lake 経由の Iceberg）から ML 結果を読みます。この手順では `hr_lake` を作らないため、そのままではダッシュボードなどがエラーになります。
-> ログイン後、**サイドバーのデータ経路の切り替えを `snowflake-sdk` にしてください**（Cookie に保存されます）。
-> pg_lake は Postgres の STANDARD 以上の階層でしか有効にできません（BURSTABLE では `CREATE EXTENSION pg_lake` が失敗します）。
+> アプリは既定で、Postgres の `hr_lake` スキーマ（pg_lake 経由の Iceberg）から ML 結果を読みます。この手順のままでは `hr_lake` が無いため、ダッシュボードなどがエラーになります。次のどちらかにしてください。
+> - **snowflake-sdk で読む（おすすめ）**: ログイン後、サイドバーのデータ経路の切り替えを `snowflake-sdk` にします（Cookie に保存されます）。
+> - **pg_lake で読む（任意）**: Postgres が STANDARD 以上の階層なら、`python3 scripts/sync_ml_to_pg_lake.py` で ML 結果を `hr_lake` にコピーできます。ML パイプラインや再推論を流すたびに、もう一度実行してください。BURSTABLE では `CREATE EXTENSION pg_lake` が失敗するため使えません。
+
+> [!IMPORTANT]
+> **NOTICE: 本番運用について**
+> このアプリのログイン画面とロール切替は**デモ用**です。パスワードはなく、誰でも任意の役割（人事管理者を含む）を選べます。実際の人事データで運用する場合は、少なくとも次の対応をしてください。
+> - **利用者の特定**: アプリ内にパスワードを足すのではなく、Snowflake のログインユーザー（リクエストヘッダー `sf-context-current-user`、または caller's rights での `CURRENT_USER()`）で利用者を特定します。Snowflake 側の SSO・MFA がそのまま効きます。
+> - **役割と部署の範囲**: 特定したユーザーを `hr.app_users` に結び付けて、役割と見られる部署を管理します。ログイン画面とロール切替（`/api/auth/switch-role`）は外してください。
+> - **アプリを開ける人**: アプリへの `USAGE` を渡すロールを、必要な人だけに絞ります。
+> - **秘密情報**: `SESSION_SECRET` や Postgres のパスワードは、Snowflake の SECRET で渡します。
+> - **データ**: 同梱のデータはすべて架空です。実データを入れる前に、上の対応と、社内のセキュリティレビューを済ませてください。
+>
+> 参考: [Developing secure Snowflake App Runtime applications](https://docs.snowflake.com/en/developer-guide/snowflake-app-runtime/secure-development)
 
 ## 実行手順 / How to Run
 

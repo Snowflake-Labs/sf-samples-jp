@@ -3,7 +3,7 @@ Register SHAP Stored Procedures in Snowflake.
 
 Creates two stored procedures that run SHAP calculations on Snowflake Warehouse
 instead of local CPU:
-  - HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION(sample_size INT, model_version VARCHAR)
+  - HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION(sample_size INT, model_version VARCHAR)  -- sample_size <= 0 で全員分
   - HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_RELATIONSHIP(sample_size INT, model_version VARCHAR)
 
 Usage:
@@ -51,7 +51,9 @@ def compute_shap_attrition(session: Session, sample_size: int, model_version: st
     model_ref = reg.get_model("ATTRITION_MODEL").version(model_version)
     native_model = model_ref.load(force=True)
 
-    feat_df = session.table("HR_ANALYTICS.PUBLIC.ATTRITION_FEATURES").sample(n=sample_size).to_pandas()
+    # sample_size <= 0 なら全員分。CSV や詳細画面の「主要因」は全員に必要なので、離職予測は全件で計算する
+    feat_tbl = session.table("HR_ANALYTICS.PUBLIC.ATTRITION_FEATURES")
+    feat_df = (feat_tbl if sample_size <= 0 else feat_tbl.sample(n=sample_size)).to_pandas()
     X = feat_df[feature_cols].astype(float)
 
     explainer = shap.TreeExplainer(native_model)
@@ -169,5 +171,5 @@ except Exception as e:
 session.close()
 print("\n=== Stored Procedures registered ===")
 print("Usage:")
-print("  CALL HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION(2000, 'V20260315');")
+print("  CALL HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_ATTRITION(0, 'V20260315');  -- 0 = 全員分")
 print("  CALL HR_ANALYTICS.PUBLIC.COMPUTE_SHAP_RELATIONSHIP(2000, 'V20260315');")
