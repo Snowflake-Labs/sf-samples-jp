@@ -117,7 +117,7 @@ export default function EvaluationsPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [opError, setOpError] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ score: "", grade: "", gradeReason: "", comment: "", status: "" });
+  const [editForm, setEditForm] = useState({ score: "", grade: "", gradeReason: "", comment: "", status: "", reviewNote: "" });
   const ai = useAiDetail(modalOpen && selectedEval ? selectedEval.EVALUATION_ID : null);
   const recommended = ai.detail?.scored ? ai.detail.standardGrade : null;
   const gradeChoices = recommended && ai.detail ? ai.detail.allowedGrades : GRADES;
@@ -195,9 +195,29 @@ export default function EvaluationsPage() {
       gradeReason: "",
       comment: ev.COMMENT || "",
       status: ev.STATUS || "draft",
+      reviewNote: "",
     });
     setModalOpen(true);
   };
+
+  // /evaluations?edit=<id> opens that evaluation in edit mode (from 評価横断レビュー).
+  const [editFromLink, setEditFromLink] = useState(false);
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("edit"));
+    if (!Number.isInteger(id) || id <= 0) return;
+    fetch(`/api/evaluations/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((ev: EvalRow | null) => {
+        if (!ev) return;
+        openEvalModal(ev);
+        setEditFromLink(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (editFromLink && ai.detail) { setEditFromLink(false); startEditing(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editFromLink, ai.detail]);
 
   const startEditing = () => {
     if (!selectedEval) return;
@@ -207,6 +227,7 @@ export default function EvaluationsPage() {
       gradeReason: ai.detail?.gradeReason || "",
       comment: selectedEval.COMMENT || "",
       status: selectedEval.STATUS || "draft",
+      reviewNote: ai.detail?.reviewNote || "",
     });
     setEditing(true);
   };
@@ -240,6 +261,17 @@ export default function EvaluationsPage() {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "更新に失敗しました");
+      }
+      if (ai.detail?.scored && editForm.reviewNote.trim() !== (ai.detail.reviewNote ?? "")) {
+        const r = await fetch(`/api/evaluations/${selectedEval.EVALUATION_ID}/axes`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviewNote: editForm.reviewNote }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.error || "横断レビューメモの保存に失敗しました");
+        }
       }
       const updated = {
         ...selectedEval,
@@ -508,6 +540,19 @@ export default function EvaluationsPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">横断レビューメモ（評価横断レビューの「手動修正メモ」と同じ）</p>
+                    {ai.detail?.scored ? (
+                      <Textarea
+                        value={editForm.reviewNote}
+                        onChange={(e) => setEditForm((f) => ({ ...f, reviewNote: e.target.value }))}
+                        rows={2}
+                        placeholder="部門をまたいだ比較で気づいたこと、修正の理由など..."
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground rounded-md border p-2">データなし（評価項目をAIで採点すると入力できます）</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">ステータス</p>
                     <div className="flex gap-2 flex-wrap">
                       <Button size="sm" variant={editForm.status === "draft" ? "default" : "outline"}
@@ -576,6 +621,13 @@ export default function EvaluationsPage() {
                   </div>
 
                   <GradeTrail finalGrade={selectedEval.GRADE} detail={ai.detail} />
+
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">横断レビューメモ</p>
+                    <p className="text-sm bg-muted/50 rounded-md p-3 whitespace-pre-wrap">
+                      {ai.detail?.reviewNote || <span className="text-muted-foreground">データなし</span>}
+                    </p>
+                  </div>
 
                   {ai.detail?.gradeReason && (
                     <p className="text-xs">

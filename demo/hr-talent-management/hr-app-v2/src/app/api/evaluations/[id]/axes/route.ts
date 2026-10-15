@@ -33,11 +33,16 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       [id]
     );
     const axes = await loadAxes(id);
+    const [note] = await pgQuery<{ NOTE: string | null }>(
+      `SELECT manual_note AS "NOTE" FROM hr.eval_quantified_scores WHERE evaluation_id = $1`,
+      [id]
+    );
     const scored = axes.axes.every((a) => a.effective !== null);
     return NextResponse.json({
       ...axes,
       scored,
       gradeReason: ev.GRADE_REASON,
+      reviewNote: note?.NOTE ?? null,
       calibration: cal
         ? { grade: cal.GRADE, reason: cal.REASON, sessionName: cal.SESSION_NAME, finalized: cal.STATUS === "finalized" }
         : null,
@@ -48,6 +53,31 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   } catch (error) {
     console.error("evaluation axes error:", error);
     return NextResponse.json({ error: "AI採点の取得に失敗しました" }, { status: 500 });
+  }
+}
+
+/**
+ * The cross-review memo (評価横断レビュー「手動修正メモ」), written from 評価管理.
+ * It lives on the AI-score row, so it needs a scored evaluation.
+ */
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  const auth = requireRole(session, ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
+  const id = Number((await ctx.params).id);
+  if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  try {
+    const { reviewNote } = (await request.json()) as { reviewNote?: string | null };
+    const rows = await pgQuery(
+      `UPDATE hr.eval_quantified_scores SET manual_note = $2, updated_at = NOW()
+       WHERE evaluation_id = $1 RETURNING evaluation_id`,
+      [id, reviewNote?.trim() || null]
+    );
+    if (rows.length === 0) return NextResponse.json({ error: "先にAI採点してください" }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("review note save error:", error);
+    return NextResponse.json({ error: "保存に失敗しました" }, { status: 500 });
   }
 }
 

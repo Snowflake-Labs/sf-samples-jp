@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useHonbu } from "@/lib/honbu-context";
 import { useAuth } from "@/lib/auth-context";
 import { AXIS_FIELDS, AxisEditor, type AxisValue } from "@/components/evaluation/axis-editor";
-import { Brain, Save, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import { Brain, Save, ChevronUp, ChevronDown, Loader2, Pencil } from "lucide-react";
+import Link from "next/link";
 
 interface EmpRow {
   EMPLOYEE_ID: number;
@@ -431,8 +432,18 @@ export default function CrossReviewPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           {detailRow && (
             <>
-              <DialogHeader>
-                <DialogTitle>{detailRow.NAME} — {detailRow.GRADE} {detailRow.POSITION_TITLE}</DialogTitle>
+              <DialogHeader className="pr-10">
+                <DialogTitle className="flex items-center gap-2">
+                  {detailRow.NAME} — {detailRow.GRADE} {detailRow.POSITION_TITLE}
+                  {canEdit && (
+                    <Link href={`/evaluations?edit=${detailRow.EVALUATION_ID}`}>
+                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
+                        <Pencil className="h-3.5 w-3.5" />
+                        評価管理で編集
+                      </Button>
+                    </Link>
+                  )}
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">

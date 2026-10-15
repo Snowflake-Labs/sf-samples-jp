@@ -16,6 +16,7 @@ export interface AiDetail {
   expectationGap: number | null;
   allowedGrades: string[];
   gradeReason: string | null;
+  reviewNote: string | null;
   calibration: { grade: string | null; reason: string; sessionName: string; finalized: boolean } | null;
 }
 
@@ -26,8 +27,8 @@ export interface AiDetail {
 export function GradeTrail({ finalGrade, detail }: { finalGrade: string | null; detail: AiDetail | null }) {
   const cal = detail?.calibration;
   const steps = [
-    { label: "AI推奨", value: detail?.standardGrade ?? null, note: detail?.scored ? null : "未採点" },
-    { label: "調整会議", value: cal?.grade ?? null, note: cal ? `${cal.sessionName}${cal.finalized ? "" : "（未確定）"}` : "調整なし" },
+    { label: "推奨グレード（5軸から）", value: detail?.standardGrade ?? null, note: null },
+    { label: "調整会議", value: cal?.grade ?? null, note: cal ? `${cal.sessionName}${cal.finalized ? "" : "（未確定）"}` : null },
     { label: "最終グレード", value: finalGrade, note: null },
   ];
   return (
@@ -36,7 +37,7 @@ export function GradeTrail({ finalGrade, detail }: { finalGrade: string | null; 
         {steps.map((s) => (
           <div key={s.label} className="rounded-md border p-2">
             <p className="text-[10px] text-muted-foreground">{s.label}</p>
-            <p className="font-mono font-semibold">{s.value ?? "—"}</p>
+            {s.value ? <p className="font-mono font-semibold">{s.value}</p> : <p className="text-xs text-muted-foreground mt-1">データなし</p>}
             {s.note && <p className="text-[10px] text-muted-foreground truncate">{s.note}</p>}
           </div>
         ))}
@@ -109,7 +110,7 @@ export function AiScoringPanel({
   }
 
   if (error) return <p className="text-xs text-destructive">{error}</p>;
-  if (!detail) return <p className="text-xs text-muted-foreground">AI採点を読み込み中...</p>;
+  if (!detail) return <p className="text-xs text-muted-foreground">評価項目を読み込み中...</p>;
 
   const scoreButton = (
     <Button size="sm" variant={detail.scored && !detail.stale ? "outline" : "default"} onClick={score}
@@ -119,13 +120,23 @@ export function AiScoringPanel({
     </Button>
   );
 
+  const label = new Map<string, string>(AXIS_FIELDS.map((f) => [f.axis, f.label]));
+
   if (!detail.scored) {
     return (
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">AI採点（5軸）</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">評価項目（5軸）</CardTitle></CardHeader>
         <CardContent className="space-y-2">
+          <div className="grid grid-cols-5 gap-2 text-center">
+            {AXIS_FIELDS.map((f) => (
+              <div key={f.axis} className="rounded-md border p-2">
+                <p className="text-[10px] text-muted-foreground">{f.label}</p>
+                <p className="text-xs text-muted-foreground mt-1">データなし</p>
+              </div>
+            ))}
+          </div>
           <p className="text-xs text-muted-foreground">
-            {hasComment ? "まだAI採点していません。コメントから5軸のスコアと推奨グレードを出します。" : "コメントを入力してから採点してください。"}
+            {hasComment ? "コメントからAIで5軸を採点できます。採点後は軸ごとに修正できます。" : "コメントを入力すると、AIで5軸を採点できます。"}
           </p>
           {err && <p className="text-xs text-destructive">{err}</p>}
           <div className="flex justify-end">{scoreButton}</div>
@@ -137,14 +148,13 @@ export function AiScoringPanel({
   const values: AxisValue[] = detail.axes.map((a) => ({
     axis: a.axis, ai: a.ai, score: Number(a.effective), reason: a.reason,
   }));
-  const label = new Map<string, string>(AXIS_FIELDS.map((f) => [f.axis, f.label]));
 
   return (
     <div className="space-y-3">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            AI採点（5軸）
+            評価項目（5軸）
             {detail.standardGrade && <Badge variant="outline">推奨 {detail.standardGrade}</Badge>}
             {detail.expectationGap != null && (
               <span className="text-xs font-normal text-muted-foreground">期待比 {detail.expectationGap > 0 ? "+" : ""}{detail.expectationGap.toFixed(2)}</span>
@@ -160,14 +170,14 @@ export function AiScoringPanel({
           )}
           <div className="grid grid-cols-5 gap-2 text-center">
             {values.map((v) => (
-              <div key={v.axis}>
+              <div key={v.axis} className="rounded-md border p-2">
                 <p className="text-[10px] text-muted-foreground">{label.get(v.axis) ?? v.axis}</p>
                 <p className="font-mono font-semibold">{v.score}</p>
                 {v.ai != null && v.score !== v.ai && <p className="text-[9px] text-violet-700">AI {v.ai}</p>}
               </div>
             ))}
           </div>
-          {detail.reasoning && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{detail.reasoning}</p>}
+          {detail.reasoning && <p className="text-xs text-muted-foreground whitespace-pre-wrap">AIの採点根拠: {detail.reasoning}</p>}
           {err && <p className="text-xs text-destructive">{err}</p>}
           <div className="flex justify-end">{scoreButton}</div>
         </CardContent>
