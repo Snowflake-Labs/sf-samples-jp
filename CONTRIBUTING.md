@@ -154,7 +154,7 @@ GROUP BY customer_id;
 | フォルダ | 配置するコンテンツ |
 |---------|-----------------|
 | `events/` | イベント・勉強会・カンファレンス向けのコンテンツ。イベントごとにサブフォルダを作成してください（例: `events/202501_snowday-japan/`） |
-| `demo/` | 商談・POC向けのデモスクリプト・Streamlitアプリ・Notebookなど。各デモは `YYYYMM_デモ名/` のサブフォルダを作成し、**必ず `README.md` を配置すること**（[テンプレート](demo/README_TEMPLATE.md)を使用） |
+| `demo/` | 商談・POC向けのデモスクリプト・Streamlitアプリ・Notebookなど。各デモは `デモ名/` のサブフォルダを作成し、**必ず `README.md` を配置すること**（[テンプレート](demo/README_TEMPLATE.md)を使用） |
 | `handson/` | ハンズオンワークショップ向けのSQL・手順書・資材 |
 
 各フォルダには `README.md` を作成し、コンテンツの概要・前提条件・実行手順を記載してください。
