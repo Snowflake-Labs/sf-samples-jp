@@ -3,12 +3,14 @@ import { pgQuery } from "@/lib/postgres";
 import { query } from "@/lib/sf-client";
 import { getDataPath } from "@/lib/data-path";
 import { getSession } from "@/lib/session";
+import { resolveHonbuScope } from "@/lib/scope";
 import type { Binds } from "snowflake-sdk";
 
-async function viaSf(honbuNum: number | null, limit: number, offset: number) {
-  const sfDeptBinds = honbuNum !== null ? [honbuNum, honbuNum] : [];
-  const sfDeptFilter = honbuNum !== null
-    ? `AND e.DEPT_ID IN (SELECT DEPT_ID FROM HR_ANALYTICS.STAGING.DEPARTMENTS WHERE DEPT_ID = ? OR PARENT_DEPT_ID = ?)`
+async function viaSf(honbuIds: number[] | null, limit: number, offset: number) {
+  const marks = honbuIds ? honbuIds.map(() => "?").join(",") : "";
+  const sfDeptBinds = honbuIds ? [...honbuIds, ...honbuIds] : [];
+  const sfDeptFilter = honbuIds
+    ? `AND e.DEPT_ID IN (SELECT DEPT_ID FROM HR_ANALYTICS.STAGING.DEPARTMENTS WHERE DEPT_ID IN (${marks}) OR PARENT_DEPT_ID IN (${marks}))`
     : "";
 
   const [predictions, totalRes, riskDist] = await Promise.all([
@@ -48,12 +50,13 @@ async function viaSf(honbuNum: number | null, limit: number, offset: number) {
   return { predictions, total: totalRes[0]?.CNT || 0, riskDist };
 }
 
-async function viaPgLake(honbuNum: number | null, limit: number, offset: number) {
-  const deptFilter = honbuNum !== null
-    ? `AND e.dept_id IN (SELECT dept_id FROM hr.departments WHERE dept_id = $3 OR parent_dept_id = $3)`
+async function viaPgLake(honbuIds: number[] | null, limit: number, offset: number) {
+  const scopeFilter = (n: number) => honbuIds
+    ? `AND e.dept_id IN (SELECT dept_id FROM hr.departments WHERE dept_id = ANY($${n}::int[]) OR parent_dept_id = ANY($${n}::int[]))`
     : "";
-  const baseParams = honbuNum !== null ? [limit, offset, honbuNum] : [limit, offset];
-  const countParams = honbuNum !== null ? [honbuNum] : [];
+  const deptFilter = scopeFilter(3);
+  const baseParams = honbuIds ? [limit, offset, honbuIds] : [limit, offset];
+  const countParams = honbuIds ? [honbuIds] : [];
 
   const [predictions, totalRes, riskDist] = await Promise.all([
     pgQuery<{
@@ -79,14 +82,14 @@ async function viaPgLake(honbuNum: number | null, limit: number, offset: number)
       SELECT COUNT(*)::int AS "CNT"
       FROM hr_lake.prediction_results pr
       JOIN hr.employees e ON pr.employee_id = e.employee_id
-      WHERE e.status = 'active' ${honbuNum !== null ? `AND e.dept_id IN (SELECT dept_id FROM hr.departments WHERE dept_id = $1 OR parent_dept_id = $1)` : ""}
+      WHERE e.status = 'active' ${scopeFilter(1)}
     `, countParams),
 
     pgQuery<{ RISK_LABEL: string; CNT: number }>(`
       SELECT pr.risk_label AS "RISK_LABEL", COUNT(*)::int AS "CNT"
       FROM hr_lake.prediction_results pr
       JOIN hr.employees e ON pr.employee_id = e.employee_id
-      WHERE e.status = 'active' ${honbuNum !== null ? `AND e.dept_id IN (SELECT dept_id FROM hr.departments WHERE dept_id = $1 OR parent_dept_id = $1)` : ""}
+      WHERE e.status = 'active' ${scopeFilter(1)}
       GROUP BY pr.risk_label
     `, countParams),
   ]);
@@ -105,13 +108,17 @@ export async function GET(request: Request) {
     const limit = Math.min(Number(searchParams.get("limit") || "200"), 500);
     const offset = Number(searchParams.get("offset") || "0");
     const honbuNum = honbu ? Number(honbu) : null;
+    const scope = resolveHonbuScope(session, honbuNum);
+    if (!scope.ok) {
+      return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
+    }
 
     const dataPath = await getDataPath();
     const t0 = performance.now();
 
     const { predictions, total, riskDist } = dataPath === "pg_lake"
-      ? await viaPgLake(honbuNum, limit, offset)
-      : await viaSf(honbuNum, limit, offset);
+      ? await viaPgLake(scope.honbuIds, limit, offset)
+      : await viaSf(scope.honbuIds, limit, offset);
 
     const ms = Math.round(performance.now() - t0);
 

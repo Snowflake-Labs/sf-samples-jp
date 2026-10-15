@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { getSession } from "@/lib/session";
+import { resolveHonbuScope } from "@/lib/scope";
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -10,17 +11,10 @@ export async function GET(req: Request) {
   const honbu = searchParams.get("honbu");
   if (!honbu) return NextResponse.json({ error: "honbu required" }, { status: 400 });
 
-  const deptScope = session.deptScope;
-  const params: unknown[] = [];
-  let deptFilter = "";
-  if (deptScope && deptScope.length > 0) {
-    const placeholders = deptScope.map((_, i) => `$${i + 1}`).join(",");
-    deptFilter = `AND d.parent_dept_id IN (${placeholders})`;
-    params.push(...deptScope);
-  } else {
-    params.push(Number(honbu));
-    deptFilter = `AND (d.dept_id = $1 OR d.parent_dept_id = $1)`;
-  }
+  const scope = resolveHonbuScope(session, Number(honbu));
+  if (!scope.ok) return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
+  const params: unknown[] = [scope.honbuIds ?? [Number(honbu)]];
+  const deptFilter = `AND (d.dept_id = ANY($1::int[]) OR d.parent_dept_id = ANY($1::int[]))`;
 
   const rows = await pgQuery<Record<string, unknown>>(
     `SELECT e.employee_code, e.last_name || ' ' || e.first_name AS name,

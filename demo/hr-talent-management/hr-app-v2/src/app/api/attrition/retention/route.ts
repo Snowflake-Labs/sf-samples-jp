@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { query } from "@/lib/sf-client";
 import { getDataPath } from "@/lib/data-path";
+import { isEmployeeInScope } from "@/lib/scope";
 import { getSession } from "@/lib/session";
 import type { Binds } from "snowflake-sdk";
 
@@ -74,6 +75,9 @@ export async function POST(request: Request) {
     const { employeeId } = await request.json();
     if (!employeeId) {
       return NextResponse.json({ error: "employeeId required" }, { status: 400 });
+    }
+    if (!(await isEmployeeInScope(session, Number(employeeId)))) {
+      return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
     }
 
     const dataPath = await getDataPath();

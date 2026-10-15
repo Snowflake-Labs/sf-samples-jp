@@ -790,8 +790,12 @@ CREATE TABLE IF NOT EXISTS hr.agent_threads (
     updated_at timestamp with time zone DEFAULT now(),
     messages jsonb DEFAULT '[]'::jsonb,
     parent_message_id text DEFAULT '0'::text,
+    owner_username text,
     PRIMARY KEY (thread_id)
 );
+-- 既存環境向け（会話履歴は持ち主ごとに分ける）
+ALTER TABLE hr.agent_threads ADD COLUMN IF NOT EXISTS owner_username text;
+CREATE INDEX IF NOT EXISTS idx_agent_threads_owner ON hr.agent_threads(owner_username, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS hr.user_feedback (
     feedback_id SERIAL,

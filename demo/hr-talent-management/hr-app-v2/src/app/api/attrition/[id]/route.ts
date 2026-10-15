@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { query } from "@/lib/sf-client";
 import { getDataPath } from "@/lib/data-path";
+import { isEmployeeInScope } from "@/lib/scope";
 import { getSession } from "@/lib/session";
 import type { Binds } from "snowflake-sdk";
 
@@ -90,6 +91,9 @@ export async function GET(
   try {
     const { id } = await params;
     const empId = Number(id);
+    if (!(await isEmployeeInScope(session, empId))) {
+      return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
+    }
     const dataPath = await getDataPath();
     const t0 = performance.now();
 

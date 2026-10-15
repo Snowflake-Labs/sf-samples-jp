@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
-import { getSession, isHonbuAllowed } from "@/lib/session";
+import { getSession, isHonbuAllowed, requireRole } from "@/lib/session";
+import { isDeptInScope } from "@/lib/scope";
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-  }
+  // 社員の登録は人事管理者・部門マネージャーだけ。閲覧専用ロールは不可
+  const auth = requireRole(session, ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   try {
     const body = await request.json();
     const {
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
 
     if (!EMPLOYEE_CODE || !FIRST_NAME || !LAST_NAME || !HIRE_DATE || !DEPT_ID) {
       return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
+    }
+    if (!(await isDeptInScope(auth.user, Number(DEPT_ID)))) {
+      return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
     }
 
     const existing = await pgQuery(

@@ -3,6 +3,7 @@ import { pgQuery } from "@/lib/postgres";
 import { query } from "@/lib/sf-client";
 import { getDataPath } from "@/lib/data-path";
 import { getSession, requireRole } from "@/lib/session";
+import { isDeptInScope, isEmployeeInScope } from "@/lib/scope";
 import type { Binds } from "snowflake-sdk";
 
 async function mlViaSf(idNum: number) {
@@ -99,6 +100,10 @@ export async function GET(
   try {
     const { id } = await params;
     const idNum = Number(id);
+    // 部署スコープ外の社員は、存在するかどうかも含めて見せない
+    if (!(await isEmployeeInScope(session, idNum))) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
     const url = new URL(request.url);
     const section = url.searchParams.get("section");
 
@@ -303,8 +308,12 @@ export async function PUT(
       `SELECT updated_at, dept_id, position_id FROM hr.employees WHERE employee_id = $1`,
       [idNum]
     );
-    if (!current) {
+    if (!current || !(await isEmployeeInScope(auth.user, idNum))) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+    // スコープ外の部署へ動かすことも不可
+    if (fields.DEPT_ID != null && !(await isDeptInScope(auth.user, Number(fields.DEPT_ID)))) {
+      return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 });
     }
     if (clientUpdatedAt && new Date(clientUpdatedAt as string).getTime() !== new Date(current.updated_at).getTime()) {
       return NextResponse.json(
