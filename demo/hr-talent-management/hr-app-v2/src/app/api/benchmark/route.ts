@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { query } from "@/lib/sf-client";
-import { getSession } from "@/lib/session";
+import { getSession, requireRole } from "@/lib/session";
 
 interface BenchResult {
   path: string;
@@ -64,10 +64,9 @@ async function runPg(sql: string): Promise<BenchResult> {
 }
 
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-  }
+  // 全社分のクエリを繰り返し流す性能比較なので、人事管理者だけに絞る
+  const auth = requireRole(await getSession(), ["HR_ADMIN"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   try {
     const { searchParams } = new URL(request.url);
     const queryKey = searchParams.get("query");

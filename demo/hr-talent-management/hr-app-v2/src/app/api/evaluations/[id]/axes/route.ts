@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { getSession, requireRole } from "@/lib/session";
+import { isEvaluationInScope } from "@/lib/scope";
 import { aiScoresOf, loadAxes } from "@/lib/my-team";
 import { allowedGrades, applyAxisInputs, type AxisInputs } from "@/lib/manager-override";
 import { rerankPeriod, saveScores } from "@/lib/recalculate";
@@ -16,6 +17,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  if (!(await isEvaluationInScope(auth.user, id))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
   try {
     const [ev] = await pgQuery<{ COMMENT: string | null; GRADE_REASON: string | null }>(
       `SELECT comment AS "COMMENT", grade_reason AS "GRADE_REASON" FROM hr.evaluations WHERE evaluation_id = $1`,
@@ -66,6 +68,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  if (!(await isEvaluationInScope(auth.user, id))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
   try {
     const { reviewNote } = (await request.json()) as { reviewNote?: string | null };
     const rows = await pgQuery(
@@ -92,6 +95,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ id: string 
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  if (!(await isEvaluationInScope(auth.user, id))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
   try {
     const { axes } = (await request.json()) as { axes?: AxisInputs };
     if (!axes) return NextResponse.json({ error: "修正内容がありません" }, { status: 400 });

@@ -46,3 +46,17 @@ export async function isEmployeeInScope(session: SessionUser, employeeId: number
   );
   return rows.length > 0;
 }
+
+/** 評価の対象社員がスコープ内か。評価がない場合も false */
+export async function isEvaluationInScope(session: SessionUser, evaluationId: number): Promise<boolean> {
+  if (!session.deptScope) return true;
+  const rows = await pgQuery(
+    `SELECT 1 FROM hr.evaluations ev
+     JOIN hr.employees e ON ev.employee_id = e.employee_id
+     JOIN hr.departments d ON e.dept_id = d.dept_id
+     WHERE ev.evaluation_id = $1
+       AND (d.dept_id = ANY($2::int[]) OR d.parent_dept_id = ANY($2::int[]))`,
+    [evaluationId, session.deptScope]
+  );
+  return rows.length > 0;
+}

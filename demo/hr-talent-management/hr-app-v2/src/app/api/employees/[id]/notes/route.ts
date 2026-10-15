@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
-import { getSession } from "@/lib/session";
+import { getSession, requireRole } from "@/lib/session";
+import { isEmployeeInScope } from "@/lib/scope";
 
 export async function GET(
   request: Request,
@@ -13,6 +14,9 @@ export async function GET(
   try {
     const { id } = await params;
     const empId = Number(id);
+    if (!(await isEmployeeInScope(session, empId))) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category") || "";
     const limit = Math.min(Number(searchParams.get("limit")) || 50, 200);
@@ -56,13 +60,15 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-  }
+  // 更新は人事管理者・部門マネージャーだけ。部署スコープ外の社員は不可
+  const auth = requireRole(await getSession(), ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   try {
     const { id } = await params;
     const empId = Number(id);
+    if (!(await isEmployeeInScope(auth.user, empId))) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
     const body = await request.json();
     const { manager_id, note_date, content, category, is_private } = body;
 
@@ -87,13 +93,15 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-  }
+  // 更新は人事管理者・部門マネージャーだけ。部署スコープ外の社員は不可
+  const auth = requireRole(await getSession(), ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   try {
     const { id } = await params;
     const empId = Number(id);
+    if (!(await isEmployeeInScope(auth.user, empId))) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
     const body = await request.json();
     const { note_id, content, category, is_private } = body;
 
@@ -117,13 +125,15 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-  }
+  // 更新は人事管理者・部門マネージャーだけ。部署スコープ外の社員は不可
+  const auth = requireRole(await getSession(), ["HR_ADMIN", "HR_MANAGER"]);
+  if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   try {
     const { id } = await params;
     const empId = Number(id);
+    if (!(await isEmployeeInScope(auth.user, empId))) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
     const { searchParams } = new URL(request.url);
     const noteId = searchParams.get("note_id");
 

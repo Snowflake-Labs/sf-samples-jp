@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { getSession, requireRole } from "@/lib/session";
+import { isEvaluationInScope } from "@/lib/scope";
 
 /**
  * HR sends a submitted review back to the line manager with a reason.
@@ -12,6 +13,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+  if (!(await isEvaluationInScope(auth.user, id))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
   try {
     const { reason } = (await request.json()) as { reason?: string };
     if (!reason || reason.trim().length < 5) {

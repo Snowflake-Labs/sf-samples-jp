@@ -4,7 +4,7 @@ import type { SessionUser } from "@/lib/types";
 const pgQuery = vi.fn();
 vi.mock("@/lib/postgres", () => ({ pgQuery: (...args: unknown[]) => pgQuery(...args) }));
 
-import { resolveHonbuScope, isDeptInScope, isEmployeeInScope } from "@/lib/scope";
+import { resolveHonbuScope, isDeptInScope, isEmployeeInScope, isEvaluationInScope } from "@/lib/scope";
 
 const admin: SessionUser = {
   userId: 1, username: "admin", role: "HR_ADMIN",
@@ -48,5 +48,13 @@ describe("isDeptInScope / isEmployeeInScope", () => {
     expect(await isEmployeeInScope(manager, 123)).toBe(true);
     expect(await isEmployeeInScope(manager, 456)).toBe(false);
     expect(pgQuery).toHaveBeenNthCalledWith(1, expect.any(String), [123, [10, 11]]);
+  });
+
+  it("checks evaluations through the evaluated employee's department", async () => {
+    expect(await isEvaluationInScope(admin, 1)).toBe(true);
+    expect(pgQuery).not.toHaveBeenCalled();
+    pgQuery.mockResolvedValueOnce([]);
+    expect(await isEvaluationInScope(manager, 914)).toBe(false);
+    expect(pgQuery).toHaveBeenCalledWith(expect.stringContaining("hr.evaluations"), [914, [10, 11]]);
   });
 });

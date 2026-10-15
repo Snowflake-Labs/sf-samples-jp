@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pgQuery } from "@/lib/postgres";
 import { getSession, requireRole } from "@/lib/session";
+import { isEvaluationInScope } from "@/lib/scope";
 import { loadAxes } from "@/lib/my-team";
 import { validateFinalGrade } from "@/lib/manager-override";
 
@@ -34,6 +35,7 @@ export async function GET(
   }
   try {
     const { id } = await params;
+    if (!(await isEvaluationInScope(session, Number(id)))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
     const evaluations = await pgQuery(EVAL_DETAIL_SQL, [Number(id)]);
 
     if (evaluations.length === 0) {
@@ -57,6 +59,7 @@ export async function PUT(
     const { id } = await params;
     const idNum = Number(id);
     if (!Number.isInteger(idNum)) return NextResponse.json({ error: "評価IDが不正です" }, { status: 400 });
+    if (!(await isEvaluationInScope(auth.user, idNum))) return NextResponse.json({ error: "Evaluation not found" }, { status: 404 });
     const body = await request.json();
 
     // Once AI scores exist, the final grade follows the same rule as the line
