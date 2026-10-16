@@ -1,3 +1,9 @@
+## Disclaimer
+
+This application is not part of the Snowflake Service and is governed by the terms in LICENSE, unless expressly agreed to in writing. You use this application at your own risk, and Snowflake has no obligation to support your use of this application.
+
+[Read more](https://github.com/Snowflake-Labs/sf-samples-jp/blob/main/LEGAL.md)
+
 # Automotive Multimodal AI Development
 
 [日本語](./README.ja.md)
