@@ -4,9 +4,12 @@
 >
 > **Disclaimer / 免責事項**
 >
-> **[EN]** All code and content in this repository is provided for **demonstration and educational purposes only**. **This content is not an official product.**
+> This application is not part of the Snowflake Service and is governed by the terms in LICENSE, unless expressly agreed to in writing. You use this application at your own risk, and Snowflake has no obligation to support your use of this application.
 >
-> **[JA]** このリポジトリ内のすべてのコード・コンテンツは、**デモおよび学習目的のみ** を意図して提供されています。**公式プロダクトではありません。**
+> （参考訳）本アプリケーションは Snowflake Service の一部ではなく、書面による明示的な合意がない限り LICENSE の条件に従います。本アプリケーションの利用はご自身の責任で行うものとし、Snowflake は本アプリケーションの利用に関していかなるサポート義務も負いません。
+> **※ この日本語訳は参考であり、必ず上記英文を確認してください。**
+>
+> [Read more](../../LEGAL.md)
 
 ---
 
@@ -15,6 +18,15 @@
 このデモでは、Snowflake Postgres・Cortex AI・Snowflake ML・Snowflake App Runtime を組み合わせ、離職予測・配置シミュレーション・人材検索・評価の AI 定量化と評価調整会議までを 1 つの人事アプリで実現する方法を示します。
 
 社員・評価などのデータはすべてスクリプトで生成した**架空のデータ**です。ログインはユーザー名のみのデモ用の簡易認証のため、本番データや外部公開環境では使用しないでください。
+
+---
+
+## 必要要件 / Requirements
+
+- Enterprise エディション以上（`sql/setup_analytics.sql` で給与・評価・メールアドレスにマスキングポリシーを、部署に行アクセスポリシーを作成するため。Standard ではこの部分が失敗します）
+- Non-Trial 環境（トライアル環境では Snowflake App Runtime と外部ネットワークアクセスが使えないため、動きません）
+- 商用リージョン（Snowflake App Runtime は政府系リージョンでは使えません）
+- Snowflake Postgres が使えること。pg_lake（任意）を使う場合は、Postgres インスタンスが STANDARD 以上の階層であること
 
 ---
 
@@ -27,7 +39,7 @@
 
 ## 前提条件 / Prerequisites
 
-- Snowflake アカウント（エディション: Enterprise 以上推奨）
+- Snowflake アカウント（上の「必要要件」を満たすもの）
 - 必要なロール・権限: `ACCOUNTADMIN`（ロール・ウェアハウス・DB の作成、`SNOWFLAKE.CORTEX_USER` の付与のため）
 - Snowflake Postgres（手順 1 で作成）
 - Node.js 22+ / Python 3.10+ / Snowflake CLI (`snow`) / `psql`
