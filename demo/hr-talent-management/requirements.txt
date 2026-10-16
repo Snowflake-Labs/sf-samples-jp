@@ -1,0 +1,10 @@
+snowflake-connector-python
+snowflake-snowpark-python
+snowflake-ml-python
+psycopg2-binary
+numpy
+pandas
+xgboost
+shap
+lightgbm
+scikit-learn

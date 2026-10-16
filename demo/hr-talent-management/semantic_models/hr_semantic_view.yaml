@@ -1,0 +1,480 @@
+name: HR_SEMANTIC_VIEW
+description: |
+  HR Intelligence 人事分析用セマンティックビュー。
+  社員マスタ、部署、ポジション、評価、1on1メモ、離職予測、関係性スコア、配置適合予測を横断的に分析可能。
+  日本語での質問に対応。
+
+tables:
+  - name: EMPLOYEES
+    description: 社員マスタ。在籍中・退職済みの全社員情報を含む。
+    base_table:
+      database: HR_ANALYTICS
+      schema: STAGING
+      table: EMPLOYEES
+    dimensions:
+      - name: EMPLOYEE_ID
+        description: 社員ID（一意キー）
+        expr: EMPLOYEE_ID
+        data_type: NUMBER
+        unique: true
+      - name: EMPLOYEE_CODE
+        description: 社員コード（表示用）
+        expr: EMPLOYEE_CODE
+        data_type: TEXT
+      - name: FIRST_NAME
+        description: 名
+        expr: FIRST_NAME
+        data_type: TEXT
+      - name: LAST_NAME
+        description: 姓
+        expr: LAST_NAME
+        data_type: TEXT
+      - name: FULL_NAME
+        description: 氏名（姓 + 名）
+        expr: LAST_NAME || ' ' || FIRST_NAME
+        data_type: TEXT
+        synonyms:
+          - 名前
+          - 社員名
+          - 氏名
+      - name: GENDER
+        description: 性別（M=男性, F=女性）
+        expr: GENDER
+        data_type: TEXT
+        synonyms:
+          - 性別
+      - name: STATUS
+        description: 在籍状態（active=在籍中, inactive=退職済み）
+        expr: STATUS
+        data_type: TEXT
+        synonyms:
+          - 在籍状況
+          - 在籍ステータス
+      - name: EMPLOYMENT_TYPE
+        description: 雇用形態（full_time=正社員, contract=契約社員, part_time=パートタイム）
+        expr: EMPLOYMENT_TYPE
+        data_type: TEXT
+        synonyms:
+          - 雇用形態
+      - name: DEPT_ID
+        description: 所属部署ID
+        expr: DEPT_ID
+        data_type: NUMBER
+      - name: POSITION_ID
+        description: ポジションID
+        expr: POSITION_ID
+        data_type: NUMBER
+      - name: MANAGER_ID
+        description: 上司の社員ID
+        expr: MANAGER_ID
+        data_type: NUMBER
+    time_dimensions:
+      - name: HIRE_DATE
+        description: 入社日
+        expr: HIRE_DATE
+        data_type: DATE
+        synonyms:
+          - 入社日
+      - name: BIRTH_DATE
+        description: 生年月日
+        expr: BIRTH_DATE
+        data_type: DATE
+      - name: LAST_PROMOTION_DATE
+        description: 最終昇進日
+        expr: LAST_PROMOTION_DATE
+        data_type: DATE
+        synonyms:
+          - 昇進日
+    facts:
+      - name: SALARY
+        description: 年収（円）
+        expr: SALARY
+        data_type: NUMBER
+        synonyms:
+          - 給与
+          - 年収
+          - 給料
+      - name: COMMUTE_TIME_MINUTES
+        description: 通勤時間（分）
+        expr: COMMUTE_TIME_MINUTES
+        data_type: NUMBER
+        synonyms:
+          - 通勤時間
+      - name: TENURE_MONTHS
+        description: 在籍月数
+        expr: DATEDIFF('month', HIRE_DATE, CURRENT_DATE())
+        data_type: NUMBER
+        synonyms:
+          - 勤続年数
+          - 在籍期間
+
+  - name: DEPARTMENTS
+    description: 部署マスタ。3階層（Level 0=社長, Level 1=本部, Level 2=室/支店/センター）。
+    base_table:
+      database: HR_ANALYTICS
+      schema: STAGING
+      table: DEPARTMENTS
+    dimensions:
+      - name: DEPT_ID
+        description: 部署ID（一意キー）
+        expr: DEPT_ID
+        data_type: NUMBER
+        unique: true
+      - name: DEPT_NAME
+        description: 部署名
+        expr: DEPT_NAME
+        data_type: TEXT
+        synonyms:
+          - 部署
+          - 部門
+          - 部門名
+      - name: DEPT_CODE
+        description: 部署コード
+        expr: DEPT_CODE
+        data_type: TEXT
+      - name: PARENT_DEPT_ID
+        description: 親部署ID（上位組織）
+        expr: PARENT_DEPT_ID
+        data_type: NUMBER
+      - name: LEVEL
+        description: 組織階層レベル（0=社長, 1=本部, 2=室/支店）
+        expr: LEVEL
+        data_type: NUMBER
+        synonyms:
+          - 階層
+          - 組織レベル
+
+  - name: POSITIONS
+    description: ポジション（役職）マスタ。等級E1(役員)～J3(新卒)の10段階。
+    base_table:
+      database: HR_ANALYTICS
+      schema: STAGING
+      table: POSITIONS
+    dimensions:
+      - name: POSITION_ID
+        description: ポジションID
+        expr: POSITION_ID
+        data_type: NUMBER
+        unique: true
+      - name: TITLE
+        description: 役職名
+        expr: TITLE
+        data_type: TEXT
+        synonyms:
+          - 役職
+          - 職位
+      - name: GRADE
+        description: 等級（E1=役員, E2=執行役員, M1=部長, M2=課長, S1=主任, S2=係長, J1=一般, J2=アソシエイト, J3=新卒）
+        expr: GRADE
+        data_type: TEXT
+        synonyms:
+          - 等級
+          - グレード
+          - ランク
+      - name: IS_VACANT
+        description: 空席フラグ
+        expr: IS_VACANT
+        data_type: BOOLEAN
+        synonyms:
+          - 空席
+          - 空きポスト
+    facts:
+      - name: HEADCOUNT
+        description: 定員数
+        expr: HEADCOUNT
+        data_type: NUMBER
+        synonyms:
+          - 定員
+
+  - name: EVALUATIONS
+    description: 人事評価データ。半期ごと（H1=上期, H2=下期）に実施。
+    base_table:
+      database: HR_ANALYTICS
+      schema: STAGING
+      table: EVALUATIONS
+    dimensions:
+      - name: EVALUATION_ID
+        description: 評価ID
+        expr: EVALUATION_ID
+        data_type: NUMBER
+      - name: EMPLOYEE_ID
+        description: 被評価者の社員ID
+        expr: EMPLOYEE_ID
+        data_type: NUMBER
+      - name: EVALUATOR_ID
+        description: 評価者の社員ID
+        expr: EVALUATOR_ID
+        data_type: NUMBER
+      - name: PERIOD
+        description: 評価期間（例：2025-H1, 2025-H2）
+        expr: PERIOD
+        data_type: TEXT
+        synonyms:
+          - 評価期間
+          - 期
+      - name: GRADE
+        description: 評価グレード（S/A/B/C/D）
+        expr: GRADE
+        data_type: TEXT
+      - name: STATUS
+        description: 評価ステータス（submitted, confirmed）
+        expr: STATUS
+        data_type: TEXT
+      - name: COMMENT
+        description: 上司による評価コメント
+        expr: COMMENT
+        data_type: TEXT
+    facts:
+      - name: SCORE
+        description: 評価スコア（1.0-5.0）
+        expr: SCORE
+        data_type: NUMBER
+        synonyms:
+          - 評価スコア
+          - 評価点
+      - name: SELF_SCORE
+        description: 自己評価スコア（1.0-5.0）
+        expr: SELF_SCORE
+        data_type: NUMBER
+        synonyms:
+          - 自己評価
+
+  - name: PREDICTION_RESULTS
+    description: 離職予測結果。MLモデル（XGBoost）による離職リスクスコア。
+    base_table:
+      database: HR_ANALYTICS
+      schema: PUBLIC
+      table: PREDICTION_RESULTS
+    dimensions:
+      - name: EMPLOYEE_ID
+        description: 社員ID
+        expr: EMPLOYEE_ID
+        data_type: NUMBER
+      - name: RISK_LABEL
+        description: リスクラベル（high=高リスク, medium=中リスク, low=低リスク）
+        expr: RISK_LABEL
+        data_type: TEXT
+        synonyms:
+          - 離職リスク
+          - リスクレベル
+          - 退職リスク
+      - name: MODEL_VERSION
+        description: モデルバージョン
+        expr: MODEL_VERSION
+        data_type: TEXT
+    time_dimensions:
+      - name: RUN_DATE
+        description: 予測実行日
+        expr: RUN_DATE
+        data_type: DATE
+    facts:
+      - name: RISK_SCORE
+        description: 離職リスクスコア（0.0-1.0、高いほど離職可能性が高い）
+        expr: RISK_SCORE
+        data_type: NUMBER
+        synonyms:
+          - 離職スコア
+          - リスクスコア
+          - 退職確率
+
+  - name: RELATIONSHIP_RESULTS
+    description: 上司-部下関係性スコア。LightGBMモデルによる関係性の質の定量化。
+    base_table:
+      database: HR_ANALYTICS
+      schema: PUBLIC
+      table: RELATIONSHIP_RESULTS
+    dimensions:
+      - name: MANAGER_ID
+        description: 上司の社員ID
+        expr: MANAGER_ID
+        data_type: NUMBER
+      - name: EMPLOYEE_ID
+        description: 部下の社員ID
+        expr: EMPLOYEE_ID
+        data_type: NUMBER
+      - name: MODEL_VERSION
+        description: モデルバージョン
+        expr: MODEL_VERSION
+        data_type: TEXT
+    facts:
+      - name: RELATIONSHIP_SCORE
+        description: 関係性スコア（0.0-1.0、高いほど良好な関係）
+        expr: RELATIONSHIP_SCORE
+        data_type: NUMBER
+        synonyms:
+          - 相性スコア
+          - 関係性
+          - 上司との関係
+
+  - name: TRANSFER_FIT_RESULTS
+    description: 配置適合予測結果。社員×対象ポジションの適合スコア。
+    base_table:
+      database: HR_ANALYTICS
+      schema: PUBLIC
+      table: TRANSFER_FIT_RESULTS
+    dimensions:
+      - name: EMPLOYEE_ID
+        description: 社員ID
+        expr: EMPLOYEE_ID
+        data_type: NUMBER
+      - name: TARGET_POSITION_ID
+        description: 異動先ポジションID
+        expr: TARGET_POSITION_ID
+        data_type: NUMBER
+      - name: MODEL_VERSION
+        description: モデルバージョン
+        expr: MODEL_VERSION
+        data_type: TEXT
+    facts:
+      - name: FIT_SCORE
+        description: 配置適合スコア（0.0-1.0、高いほど適合）
+        expr: FIT_SCORE
+        data_type: NUMBER
+        synonyms:
+          - 適合度
+          - フィットスコア
+          - 配置スコア
+
+relationships:
+  - name: EMPLOYEES_TO_DEPARTMENTS
+    left_table: EMPLOYEES
+    right_table: DEPARTMENTS
+    relationship_columns:
+      - left_column: DEPT_ID
+        right_column: DEPT_ID
+  - name: EMPLOYEES_TO_POSITIONS
+    left_table: EMPLOYEES
+    right_table: POSITIONS
+    relationship_columns:
+      - left_column: POSITION_ID
+        right_column: POSITION_ID
+  - name: EVALUATIONS_TO_EMPLOYEES
+    left_table: EVALUATIONS
+    right_table: EMPLOYEES
+    relationship_columns:
+      - left_column: EMPLOYEE_ID
+        right_column: EMPLOYEE_ID
+  - name: PREDICTIONS_TO_EMPLOYEES
+    left_table: PREDICTION_RESULTS
+    right_table: EMPLOYEES
+    relationship_columns:
+      - left_column: EMPLOYEE_ID
+        right_column: EMPLOYEE_ID
+  - name: RELATIONSHIP_TO_EMPLOYEES
+    left_table: RELATIONSHIP_RESULTS
+    right_table: EMPLOYEES
+    relationship_columns:
+      - left_column: EMPLOYEE_ID
+        right_column: EMPLOYEE_ID
+  - name: TRANSFER_FIT_TO_EMPLOYEES
+    left_table: TRANSFER_FIT_RESULTS
+    right_table: EMPLOYEES
+    relationship_columns:
+      - left_column: EMPLOYEE_ID
+        right_column: EMPLOYEE_ID
+  - name: TRANSFER_FIT_TO_POSITIONS
+    left_table: TRANSFER_FIT_RESULTS
+    right_table: POSITIONS
+    relationship_columns:
+      - left_column: TARGET_POSITION_ID
+        right_column: POSITION_ID
+
+verified_queries:
+  - name: vqr_0
+    question: 離職リスクが高い社員を教えて
+    sql: |
+      SELECT e.EMPLOYEE_ID, e.LAST_NAME || ' ' || e.FIRST_NAME AS FULL_NAME,
+             d.DEPT_NAME, p.TITLE, p.GRADE,
+             pr.RISK_SCORE, pr.RISK_LABEL
+      FROM HR_ANALYTICS.PUBLIC.PREDICTION_RESULTS pr
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES e ON pr.EMPLOYEE_ID = e.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      JOIN HR_ANALYTICS.STAGING.POSITIONS p ON e.POSITION_ID = p.POSITION_ID
+      WHERE pr.RISK_LABEL = 'high' AND e.STATUS = 'active'
+      ORDER BY pr.RISK_SCORE DESC
+      LIMIT 20
+  - name: vqr_1
+    question: 部署ごとの社員数を教えて
+    sql: |
+      SELECT d.DEPT_NAME, COUNT(*) AS EMPLOYEE_COUNT
+      FROM HR_ANALYTICS.STAGING.EMPLOYEES e
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      WHERE e.STATUS = 'active'
+      GROUP BY d.DEPT_NAME
+      ORDER BY EMPLOYEE_COUNT DESC
+  - name: vqr_2
+    question: 部署ごとの平均評価スコアを教えて
+    sql: |
+      SELECT d.DEPT_NAME, ROUND(AVG(ev.SCORE), 2) AS AVG_SCORE, COUNT(*) AS EVAL_COUNT
+      FROM HR_ANALYTICS.STAGING.EVALUATIONS ev
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES e ON ev.EMPLOYEE_ID = e.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      WHERE e.STATUS = 'active'
+      GROUP BY d.DEPT_NAME
+      ORDER BY AVG_SCORE DESC
+  - name: vqr_3
+    question: 上司との関係性スコアが低い社員は誰？
+    sql: |
+      SELECT e.LAST_NAME || ' ' || e.FIRST_NAME AS EMPLOYEE_NAME,
+             m.LAST_NAME || ' ' || m.FIRST_NAME AS MANAGER_NAME,
+             d.DEPT_NAME,
+             rr.RELATIONSHIP_SCORE
+      FROM HR_ANALYTICS.PUBLIC.RELATIONSHIP_RESULTS rr
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES e ON rr.EMPLOYEE_ID = e.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES m ON rr.MANAGER_ID = m.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      WHERE e.STATUS = 'active'
+      ORDER BY rr.RELATIONSHIP_SCORE ASC
+      LIMIT 20
+  - name: vqr_4
+    question: 営業部で離職リスクが高い社員は？
+    sql: |
+      SELECT e.LAST_NAME || ' ' || e.FIRST_NAME AS FULL_NAME,
+             d.DEPT_NAME, p.GRADE,
+             pr.RISK_SCORE, pr.RISK_LABEL
+      FROM HR_ANALYTICS.PUBLIC.PREDICTION_RESULTS pr
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES e ON pr.EMPLOYEE_ID = e.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      JOIN HR_ANALYTICS.STAGING.POSITIONS p ON e.POSITION_ID = p.POSITION_ID
+      WHERE pr.RISK_LABEL IN ('high', 'medium')
+        AND e.STATUS = 'active'
+        AND d.DEPT_NAME LIKE '%営業%'
+      ORDER BY pr.RISK_SCORE DESC
+  - name: vqr_5
+    question: 等級ごとの平均年収を教えて
+    sql: |
+      SELECT p.GRADE,
+             COUNT(*) AS EMPLOYEE_COUNT,
+             ROUND(AVG(e.SALARY)) AS AVG_SALARY,
+             ROUND(MIN(e.SALARY)) AS MIN_SALARY,
+             ROUND(MAX(e.SALARY)) AS MAX_SALARY
+      FROM HR_ANALYTICS.STAGING.EMPLOYEES e
+      JOIN HR_ANALYTICS.STAGING.POSITIONS p ON e.POSITION_ID = p.POSITION_ID
+      WHERE e.STATUS = 'active'
+      GROUP BY p.GRADE
+      ORDER BY AVG_SALARY DESC
+  - name: vqr_6
+    question: 今年入社した社員の一覧
+    sql: |
+      SELECT e.LAST_NAME || ' ' || e.FIRST_NAME AS FULL_NAME,
+             d.DEPT_NAME, p.TITLE, p.GRADE, e.HIRE_DATE
+      FROM HR_ANALYTICS.STAGING.EMPLOYEES e
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      JOIN HR_ANALYTICS.STAGING.POSITIONS p ON e.POSITION_ID = p.POSITION_ID
+      WHERE e.HIRE_DATE >= DATE_TRUNC('year', CURRENT_DATE())
+      ORDER BY e.HIRE_DATE DESC
+  - name: vqr_7
+    question: 部署ごとの離職リスク分布を教えて
+    sql: |
+      SELECT d.DEPT_NAME,
+             COUNT(CASE WHEN pr.RISK_LABEL = 'high' THEN 1 END) AS HIGH_RISK,
+             COUNT(CASE WHEN pr.RISK_LABEL = 'medium' THEN 1 END) AS MEDIUM_RISK,
+             COUNT(CASE WHEN pr.RISK_LABEL = 'low' THEN 1 END) AS LOW_RISK,
+             COUNT(*) AS TOTAL,
+             ROUND(AVG(pr.RISK_SCORE), 3) AS AVG_RISK_SCORE
+      FROM HR_ANALYTICS.PUBLIC.PREDICTION_RESULTS pr
+      JOIN HR_ANALYTICS.STAGING.EMPLOYEES e ON pr.EMPLOYEE_ID = e.EMPLOYEE_ID
+      JOIN HR_ANALYTICS.STAGING.DEPARTMENTS d ON e.DEPT_ID = d.DEPT_ID
+      WHERE e.STATUS = 'active'
+      GROUP BY d.DEPT_NAME
+      ORDER BY AVG_RISK_SCORE DESC

@@ -1,0 +1,91 @@
+version: 2
+
+name: HR_INTELLIGENCE_V2
+database: HR_ANALYTICS
+schema: STAGING
+query_warehouse: <YOUR_QUERY_WAREHOUSE>
+
+label: "HR Intelligence v2"
+description: "AI-powered HR analytics and workforce management - v2"
+
+# v2 と v3 は同じソースツリーから別サービスとしてデプロイする。
+# 既定は v2 のまま（引数なしの deploy で v3 を上書きしないため）。
+# v3 へは `snow app deploy --target v3` で明示的に出す。
+default_target: v2
+targets:
+  v2: {}
+  v3:
+    name: HR_INTELLIGENCE_V3
+    label: "HR Intelligence v3"
+    description: "AI-powered HR analytics and workforce management - v3 (期待水準スコアリング・調整会議・空席台帳)"
+
+ignore:
+  - node_modules
+  - .env*
+  - __pycache__
+  - "*.pyc"
+  - .next
+  - .git
+  - snowflake.log
+
+# The EAI must allow BOTH Postgres:5432 (application data) and the account host
+# on :443. The account host is required by runtime_manager, which downloads
+# build.tar.gz from the artifact repository before the app ever starts; without
+# it DNS fails ("no such host" against 169.254.20.10:53), the container reports
+# "User application error", and the app URL returns
+# "upstream connect error ... reset reason: remote connection failure".
+# Allowing the account host does NOT cause 395092 by itself - that came from
+# hardcoding SNOWFLAKE_HOST to the public host (see environment_variables).
+external_access_integrations:
+  - <YOUR_EAI_NAME>   # Postgres:5432 とアカウントホスト:443 を許可
+
+# Deliberately NO `run:` and NO `build:` block.
+#
+# The builder detects this project as framework=nextjs / template="node:nextjs"
+# and applies its v2 defaults, which know how to launch a Next.js app built
+# with `output: "standalone"`. Supplying `run.command` overrides that default -
+# the build log then shows:
+#     [LAUNCH] Process defined from manifest  command="node server.js"
+# and the process dies instantly, because the standalone entrypoint lives at
+# .next/standalone/server.js, not at the tarball root (/tmp/workspace). A dead
+# process means the ingress proxy has nothing to connect to, which surfaces as
+#     upstream connect error or disconnect/reset before headers.
+#     reset reason: remote connection failure
+# Setting HOSTNAME/PORT does not help either: SAR rejects both in
+# environment_variables as reserved (094516), and the platform supplies them.
+environment_variables:
+  # Neither PORT nor HOSTNAME can be set here - SAR rejects both as reserved
+  # (094516) and the platform supplies them.
+  #
+  # SNOWFLAKE_ACCOUNT and SNOWFLAKE_HOST are deliberately NOT set. The platform
+  # injects them pointing at the internal endpoint, which is the only path where
+  # the SPCS OAuth token at /snowflake/session/token is accepted. Hardcoding the
+  # public host (<account>.snowflakecomputing.com) sends the
+  # app's snowflake-sdk connection out over the public path instead, and it is
+  # rejected with 395092 "Client is unauthorized to use Snowpark Container
+  # Services OAuth token". src/lib/sf-client.ts already reads both from env.
+  - name: SNOWFLAKE_WAREHOUSE
+    value: "HR_APP_WH"
+  - name: SNOWFLAKE_DATABASE
+    value: "HR_ANALYTICS"
+  - name: SNOWFLAKE_SCHEMA
+    value: "STAGING"
+  - name: POSTGRES_HOST
+    value: "<YOUR_PG_INSTANCE>.<YOUR_ACCOUNT>.<REGION>.aws.postgres.snowflake.app"
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: POSTGRES_DB
+    value: "postgres"
+  - name: POSTGRES_USER
+    value: "<YOUR_PG_USER>"
+
+# Secret references must be FULLY QUALIFIED. With a bare name
+# ("HR_PG_PASSWORD_SECRET") the deploy still succeeds but nothing is injected,
+# so the app sees process.env.POSTGRES_PASSWORD === undefined and node-postgres
+# fails at connect time with
+#   SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string
+secrets:
+  - name: POSTGRES_PASSWORD
+    secret: HR_ANALYTICS.STAGING.HR_PG_PASSWORD_SECRET
+  - name: SESSION_SECRET
+    secret: HR_ANALYTICS.STAGING.HR_SESSION_SECRET
