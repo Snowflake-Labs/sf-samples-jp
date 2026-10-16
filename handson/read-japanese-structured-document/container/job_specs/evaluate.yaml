@@ -1,0 +1,46 @@
+# 評価ジョブ（S60）の仕様テンプレート。
+# OPS.S60_EVALUATE（オーナーは評価ロール）が EXECUTE JOB SERVICE … USING (…) で値を埋める。
+# 正解（@GOLD.FILES）と読み取り結果（@OUTPUT.RESULTS。評価ロールは READ だけ）だけをマウントする。
+# 予測側の入力（@RAW.DOCS）・作業域・キャッシュはマウントしない。コマンドをシェルで包まない。
+spec:
+  containers:
+  - name: main
+    image: {{ image }}
+    command:
+    - python
+    - -m
+    - jpdocread
+    - job
+    - s60
+    - --run-id
+    - {{ run_id }}
+    env:
+      JPDOCREAD_IMAGE_TAG: {{ image_tag }}
+      JPDOCREAD_WAREHOUSE: {{ warehouse }}
+      JPDOCREAD_DOCS: {{ docs_dir }}
+      JPDOCREAD_OUT: {{ out_dir }}
+    resources:
+      requests:
+        cpu: 1
+        memory: 3Gi
+      limits:
+        cpu: 2
+        memory: 6Gi
+    volumeMounts:
+    - name: gold
+      mountPath: /stage/gold
+    - name: results
+      mountPath: /stage/results
+  volumes:
+  - name: gold
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_gold }}
+  - name: results
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_results }}

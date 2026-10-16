@@ -1,0 +1,74 @@
+# 保険約款コーパスの設定
+name: yakkan
+title: 日本語保険約款（合成データセット yakkan-synth）
+
+source:
+  kind: huggingface                   # huggingface（既定）| local（開発用）
+  huggingface:
+    repo_id: cvusk/japanese-insurance-document-understanding  # CC BY 4.0
+    revision: 6957a90a2640b8ffa7e82c32c44b689011c7fd44        # 40 桁のコミット SHA で固定する（main は使わない）
+  local:
+    path: ${DATA_ROOT_YAKKAN}         # kind: local のときだけ使う。環境変数 → configs/deploy.local.env の順で展開する
+
+structure_builder: yakkan  # auto | yakkan | contract（yakkan は契約書の体裁の判定をしない）
+features:
+  parties: false
+  defined_terms: false
+
+# 図の few-shot 供出元。移植元の値
+figure_shots:
+  - auto-0003--nl-a4-2col-mincho
+  - oneday-0003--nl-a4-1col-plain
+
+# 評価から除外する文書（読み取りはする）。約款の供出元 2 文書は別版面を持たないので供出元と同じ
+eval_excluded:
+  - auto-0003--nl-a4-2col-mincho
+  - oneday-0003--nl-a4-1col-plain
+
+# スライス。all は manifest の status: ready から決まるので書かない
+# pilot は移植元の値（同一 content の異版面対 4 組を含む 10 文書）
+slices:
+  pilot:
+    - auto-0001--nl-a4-2col-mincho
+    - auto-0001--nl-b5-2col-dense
+    - group-0001--grp-a4-1col-mincho
+    - group-0001--grp-a4land-2col-plain
+    - life-0001--life-a4-1col-gothic
+    - life-0001--life-b5-1col-mincho
+    - golf-0001--nl-a4-2col-mincho
+    - golf-0001--nl-wide-2col-plain
+    - jyusetsu-0001--jys-a4-1col-gothic
+    - teikan-0001--teikan-a4-1col-mincho
+
+# ページ・段をまたぐ表を 1 つにつなぐか（read/stitch.py）。false なら従来どおりページごとの表を出す。
+# 既定は true（held-out で表のセル F1 が上がり、誤連結 0 だった）
+tables:
+  stitch: true
+
+# 構造の読み取りの規則（read/structure/tree.py。H14）。false なら従来どおり。
+#   supersede_empty_upper：目次の続きで先に開いた空の特約・別表を、本物の見出しで置き換える
+#   label_routine_repairs：repair_queue のうち目次・柱を規則どおり捨てた記録を resolution "routine" にする
+structure:
+  supersede_empty_upper: true
+  label_routine_repairs: true
+
+# 図の領域の絞り込み（read/regions.py。H14）。曲線が 1〜4 本の候補（署名欄・枠囲み）を図の領域にしない。
+# 図の領域ごとに AI_COMPLETE を呼ぶので、呼び出しの数が減る。false なら従来どおり
+figures:
+  filter_regions: true
+
+# 見込みクレジットの係数：正解の図 1 つあたりに検出される図領域の数
+# 移植元の実測（約款 41 文書の時点で 321 領域 / 117 図）
+cost:
+  figure_regions_per_gold_figure: 2.74
+
+# 出力 JSON の provenance.known_limits（移植元の実測値と出典）
+known_limits:
+  source: 読み取り手法の開発時の評価（約款 111 文書）。本ハンズオンの実測ではない
+  caveat: 合成コーパス（born-digital のみ）での値。重要事項説明書（jyusetsu）の引用誤り率は 0.142。日本語は AI_PARSE_DOCUMENT の公式対応言語に含まれない
+  dataset_version: v7
+  citation_error_rate_all: 0.033951
+  text_cer_all: 0.06
+  table_cell_f1_all: 0.8244
+  table_header_path_acc_all: 0.7388
+  figure_edge_f1_all: 0.7311

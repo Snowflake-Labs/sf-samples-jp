@@ -1,0 +1,11 @@
+# イメージにはコードと設定だけを入れる。データセット・出力・ログ・ローカル設定・正解由来の shot を入れない
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!configs/
+configs/deploy.local.env
+configs/shots/
+!container/requirements.lock
+**/__pycache__/
