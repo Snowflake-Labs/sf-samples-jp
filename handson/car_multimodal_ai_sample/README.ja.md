@@ -1,3 +1,11 @@
+## Disclaimer / 免責事項
+
+This application is not part of the Snowflake Service and is governed by the terms in LICENSE, unless expressly agreed to in writing. You use this application at your own risk, and Snowflake has no obligation to support your use of this application.
+
+（参考訳）本アプリケーションは Snowflake Service の一部ではなく、書面による明示的な合意がない限り LICENSE の条件に従います。本アプリケーションの利用はご自身の責任で行うものとし、Snowflake は本アプリケーションの利用に関していかなるサポート義務も負いません。※ この日本語訳は参考であり、必ず上記英文を確認してください。
+
+[Read more](https://github.com/Snowflake-Labs/sf-samples-jp/blob/main/LEGAL.md)
+
 # 自動車向けマルチモーダルAI開発
 
 [English](./README.md)
