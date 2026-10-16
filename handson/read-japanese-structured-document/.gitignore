@@ -35,3 +35,4 @@ build/
 container/requirements.lock
 
 docs/
+blog/

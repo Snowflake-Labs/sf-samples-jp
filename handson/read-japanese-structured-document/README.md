@@ -9,6 +9,14 @@
 - 所要時間：約 30〜40 分（待ち時間を含む。内訳は「[所要時間と費用の目安](#所要時間と費用の目安)」）
 - 費用の目安：AI 関数で約 0.8 クレジット（2 文書。実行時に見込みを表示します）＋ウェアハウスとコンピュートプールの稼働分
 
+## Disclaimer / 免責事項
+
+This application is not part of the Snowflake Service and is governed by the terms in LICENSE, unless expressly agreed to in writing. You use this application at your own risk, and Snowflake has no obligation to support your use of this application.
+
+（参考訳）本アプリケーションは Snowflake Service の一部ではなく、書面による明示的な合意がない限り LICENSE の条件に従います。本アプリケーションの利用はご自身の責任で行うものとし、Snowflake は本アプリケーションの利用に関していかなるサポート義務も負いません。※ この日本語訳は参考であり、必ず上記英文を確認してください。
+
+[Read more](https://github.com/Snowflake-Labs/sf-samples-jp/blob/main/LEGAL.md)
+
 ## 目次
 
 1. [このハンズオンで学ぶこと](#1-このハンズオンで学ぶこと)
@@ -209,7 +217,26 @@ flowchart LR
 
 ## 3. 準備
 
-### 3.1 必要なもの
+### 3.1 Snowflake アカウントの要件
+
+このハンズオンでは Cortex AI 関数と Snowpark Container Services（SPCS）を使用します。実行する Snowflake アカウントが、次の要件を満たしていることを確認してください。
+
+| 項目 | 要件 | 補足 |
+|---|---|---|
+| Edition | **Standard Edition 以上** | このハンズオン自体は Enterprise Edition 固有の機能を使用しません。ただし、SPCS、`AI_PARSE_DOCUMENT`、`AI_COMPLETE` が利用可能なアカウントとリージョンである必要があります |
+| Trial / Non-trial | **有償の Non-trial アカウント** | Snowflake の公式 SPCS チュートリアルでは Trial アカウントはサポート対象外です。セルフサービスの Trial では Cortex 機能も無効になっている場合があります |
+| クラウドとリージョン | SPCS と使用する Cortex AI 関数・モデルが利用可能 | SPCS は AWS・Azure・Google Cloud の商用リージョンで利用できますが、一部例外があります。`AI_PARSE_DOCUMENT` は対応リージョンでのネイティブ実行、またはクロスリージョン推論が必要です。図の既定モデルは `claude-opus-5` です |
+| 権限 | setup に使用する接続で `ACCOUNTADMIN` を使用できること | ロール、データベース、ウェアハウス、コンピュートプール、イメージリポジトリ、Task を作成し、必要なアカウント権限を付与します。共有アカウントでは事前に管理者の承認を得てください |
+| 利用枠と費用 | ウェアハウス、SPCS、Cortex AI 関数を実行できるクレジットがあること | 既定の 2 文書では AI 関数で約 0.8 クレジットに加え、ウェアハウスとコンピュートプールの稼働分が発生します |
+
+参考：
+
+- [Snowflake editions](https://docs.snowflake.com/en/user-guide/intro-editions)
+- [Snowpark Container Services](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview)
+- [Common Setup for Snowpark Container Services Tutorials](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/tutorials/common-setup)
+- [`AI_PARSE_DOCUMENT`](https://docs.snowflake.com/en/sql-reference/functions/ai_parse_document)
+
+### 3.2 ローカル環境に必要なもの
 
 | もの | 確認のしかた | 補足 |
 |---|---|---|
@@ -221,7 +248,7 @@ flowchart LR
 | git | `git --version` | |
 | huggingface.co への HTTPS 接続 | `curl -sI https://huggingface.co` | データセットを取得します。アカウントとトークンは不要です |
 
-### 3.2 リポジトリを取得して、接続名を設定する
+### 3.3 リポジトリを取得して、接続名を設定する
 
 ```bash
 git clone <このリポジトリの URL>
@@ -234,7 +261,7 @@ cp configs/deploy.env.example configs/deploy.local.env
 `configs/deploy.local.env` の `CONNECTION_NAME=<your_connection>` を、`snow connection list` に表示される接続名へ書き換えます。
 変更するのはこの 1 行だけです。接続名は、リポジトリ内のほかのファイルには記載しないでください。
 
-### 3.3 依存関係をインストールし、テストを実行する
+### 3.4 依存関係をインストールし、テストを実行する
 
 ```bash
 uv sync
