@@ -1,0 +1,9 @@
+-- 04_verifier_human_in_the_loop/sql/30_grants.sql
+-- このパターンのエージェントとプロシージャを実行ロールに許可する。
+
+USE ROLE ACCOUNTADMIN;
+
+GRANT USAGE ON AGENT <% db %>.AGENTS.TMS_VERIFIER_AGENT TO ROLE <% role %>;
+GRANT USAGE ON PROCEDURE <% db %>.APP.RUN_VERIFICATION(STRING) TO ROLE <% role %>;
+GRANT USAGE ON PROCEDURE <% db %>.APP.DECIDE_PROPOSAL(STRING, STRING) TO ROLE <% role %>;
+GRANT USAGE ON PROCEDURE <% db %>.APP.APPLY_PROPOSAL(STRING) TO ROLE <% role %>;
