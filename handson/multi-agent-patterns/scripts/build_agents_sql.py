@@ -15,6 +15,7 @@ PATTERNS = {
     "02_orchestrator_worker": ["decomposer", "dedupe", "criteria"],
     "03_agent_as_tool": ["orchestrator"],
     "04_verifier_human_in_the_loop": ["verifier"],
+    "07_parallel_fanout": ["schedule_reviewer", "ownership_reviewer", "quality_reviewer"],
 }
 
 

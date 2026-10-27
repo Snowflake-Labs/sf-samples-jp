@@ -37,7 +37,8 @@ def parse_args(description: str, default_db_env: str, default_db: str) -> argpar
 
 def run_agent(args: argparse.Namespace, agent: str, prompt: str) -> tuple[dict[str, Any], int, float]:
     body = json.dumps({"messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}]})
-    sql = f"USE WAREHOUSE {args.wh}; SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN('{args.db}.LAB.{agent}', $${body}$$) AS R"
+    # 05 / 06 は ACCOUNTADMIN で実行する前提（接続の既定ロールに依存しない）
+    sql = f"USE ROLE ACCOUNTADMIN; USE WAREHOUSE {args.wh}; SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN('{args.db}.LAB.{agent}', $${body}$$) AS R"
     started = time.time()
     p = subprocess.run(["snow", "sql", "-c", args.connection, "--format", "json", "-q", sql],
                        capture_output=True, text=True, timeout=900)

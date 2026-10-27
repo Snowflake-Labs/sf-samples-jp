@@ -10,11 +10,12 @@ run_sql "$HERE/sql/02_tables.sql"
 run_sql "$HERE/sql/03_seed.sql"
 run_sql "$HERE/sql/04_semantic_view.sql"
 run_sql "$HERE/sql/05_tools.sql"
-info "Uploading controller/src/*.py to @$DB.AGENTS.APP_STAGE/lib/src"
+info "Uploading controller/src/*.py to @${DB}.AGENTS.APP_STAGE/lib/src"
 find "$MAP_ROOT/controller" -name "__pycache__" -type d -prune -exec rm -rf {} +
 for f in "$MAP_ROOT"/controller/src/*.py; do
-  snow stage copy -c "$CONN" "$f" "@$DB.AGENTS.APP_STAGE/lib/src" --overwrite >/dev/null 2>&1 || die "upload of $f failed"
+  put_file "$f" "@${DB}.AGENTS.APP_STAGE/lib/src/" || die "upload of $f failed"
 done
+# 06_controller.sql が BUILD_CONTROLLER_ZIP を作成・実行する（以降のパターンは deploy_controller で更新）
 run_sql "$HERE/sql/06_controller.sql"
 run_sql "$HERE/sql/08_grants.sql"
 run_sql "$HERE/sql/09_smoke_tests.sql"

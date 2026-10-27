@@ -46,8 +46,17 @@ map_init() {
          MAP_MCP_DATABASE="$MCP_DB" MAP_SKILL_DATABASE="$SKILL_DB"
 }
 
-# 1 クエリを実行して JSON を返す
-sqlq() { snow sql -c "$CONN" --format json -q "$1" 2>/dev/null; }
+# 1 クエリを ACCOUNTADMIN で実行し、その結果（最後の結果セット）を JSON で返す。
+# 接続の既定ロールに依存しないよう、毎回 USE ROLE する（既定ロールが別のロールでも誤判定しない）。
+sqlq() {
+  snow sql -c "$CONN" --format json -q "USE ROLE ACCOUNTADMIN; $1" 2>/dev/null \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d[-1] if d and isinstance(d[0], list) else d))"
+}
+
+# ローカルファイルをステージにアップロードする（PUT を ACCOUNTADMIN で実行）
+put_file() {  # put_file <local file> <@stage/path/>
+  snow sql -c "$CONN" -q "USE ROLE ACCOUNTADMIN; PUT 'file://$1' '$2' AUTO_COMPRESS = FALSE OVERWRITE = TRUE" >/dev/null 2>&1
+}
 jfield() { python3 -c "import json,sys; d=json.loads(sys.argv[1]); print($2)" "$1"; }
 
 # SQL ファイルを <% var %> テンプレート変数つきで実行する。失敗時は末尾ログを表示して終了。
@@ -68,8 +77,8 @@ preflight() {
   snow connection test -c "$CONN" >/dev/null 2>&1 || { sleep 5; snow connection test -c "$CONN" >/dev/null 2>&1; } \
     || die "接続テストに失敗しました（snow connection test -c <接続名>）"
   local ctx xr value
-  ctx="$(sqlq "SELECT IS_ROLE_IN_SESSION('ACCOUNTADMIN') AS ADMIN")" || die "アカウントに問い合わせできません"
-  [[ "$(jfield "$ctx" "d[0]['ADMIN']")" == "True" ]] || die "ACCOUNTADMIN ロールを使える接続が必要です"
+  ctx="$(sqlq "SELECT CURRENT_ROLE() AS R")" || die "ACCOUNTADMIN ロールを使える接続が必要です（USE ROLE ACCOUNTADMIN に失敗）"
+  [[ "$(jfield "$ctx" "d[0]['R']")" == "ACCOUNTADMIN" ]] || die "ACCOUNTADMIN ロールを使える接続が必要です"
   xr="$(sqlq "SHOW PARAMETERS LIKE 'CORTEX_ENABLED_CROSS_REGION' IN ACCOUNT")"
   value="$(jfield "$xr" "d[0]['value'] if d else 'DISABLED'")"
   if [[ "$value" == "DISABLED" ]]; then
@@ -118,4 +127,15 @@ guard_names() {
         die "$x は削除できない名前です" ;;
     esac
   done
+}
+
+# コントローラ（controller/src/*.py）をステージに置き、Snowflake 内で zip を作り直す（00_common / 07 / 08 が使う）
+deploy_controller() {
+  info "Uploading controller/src/*.py to @${DB}.AGENTS.APP_STAGE/lib/src"
+  find "$MAP_ROOT/controller" -name "__pycache__" -type d -prune -exec rm -rf {} +
+  local f
+  for f in "$MAP_ROOT"/controller/src/*.py; do
+    put_file "$f" "@${DB}.AGENTS.APP_STAGE/lib/src/" || die "upload of $f failed"
+  done
+  sqlq "CALL ${DB}.AGENTS.BUILD_CONTROLLER_ZIP()" >/dev/null || die "BUILD_CONTROLLER_ZIP failed"
 }

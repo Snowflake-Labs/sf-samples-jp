@@ -9,7 +9,8 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PATTERNS = ["00_common", "01_router_handoff", "02_orchestrator_worker", "03_agent_as_tool",
-            "04_verifier_human_in_the_loop", "05_mcp_agent_chaining", "06_skill_composition"]
+            "04_verifier_human_in_the_loop", "05_mcp_agent_chaining", "06_skill_composition",
+            "07_parallel_fanout", "08_blackboard"]
 TEXT_FILES = [p for p in ROOT.rglob("*") if p.is_file() and p.suffix in {".sql", ".sh", ".py", ".md", ".yaml", ".json", ".example"}
               and not {"results", "__pycache__", ".pytest_cache"} & set(p.parts) and p.name not in {"AGENTS.md", "TASK.md"}]
 SQL_FILES = sorted(ROOT.glob("0*/sql/*.sql"))
@@ -141,7 +142,27 @@ def test_teardown_all_covers_every_pattern_in_dependency_order():
     code = text[text.index("run_teardown() {"):]
     # 実際に呼んでいる順序（for ループの列挙と run_teardown の呼び出し）だけを見る
     code = "\n".join(l for l in code.splitlines() if l.lstrip().startswith(("for p in", "run_teardown 0")))
-    order = ["04_verifier_human_in_the_loop", "03_agent_as_tool", "02_orchestrator_worker", "01_router_handoff",
-             "06_skill_composition", "05_mcp_agent_chaining", "00_common"]
+    order = ["08_blackboard", "07_parallel_fanout", "04_verifier_human_in_the_loop", "03_agent_as_tool",
+             "02_orchestrator_worker", "01_router_handoff", "06_skill_composition", "05_mcp_agent_chaining", "00_common"]
     positions = [code.index(p) for p in order]
-    assert positions == sorted(positions), "teardown は依存の逆順（04→03→02→01→06→05→00）で行う"
+    assert positions == sorted(positions), "teardown は依存の逆順（08→07→04→03→02→01→06→05→00）で行う"
+
+
+def test_setup_all_includes_every_pattern():
+    text = (ROOT / "scripts" / "setup_all.sh").read_text()
+    for p in PATTERNS:
+        assert p in text, p
+
+
+@pytest.mark.parametrize("pattern", ["07_parallel_fanout", "08_blackboard"])
+def test_task_patterns_stop_tasks_before_dropping(pattern):
+    sql = (ROOT / pattern / "sql" / "99_teardown.sql").read_text()
+    assert sql.index("SUSPEND") < sql.index("DROP TASK")
+    created = set(re.findall(r"CREATE OR REPLACE (?:TASK|STREAM|PROCEDURE|VIEW|AGENT) <% db %>\.(\w+\.\w+)",
+                             "".join((ROOT / pattern / "sql" / f).read_text() for f in
+                                     ("10_agents.sql", "20_objects.sql", "22_react.sql", "25_tasks.sql", "28_entry.sql")
+                                     if (ROOT / pattern / "sql" / f).exists())))
+    created |= set(re.findall(r"CREATE TABLE IF NOT EXISTS <% db %>\.(\w+\.\w+)",
+                              (ROOT / pattern / "sql" / "20_objects.sql").read_text()))
+    dropped = set(re.findall(r"DROP \w+ IF EXISTS <% db %>\.(\w+\.\w+)", sql))
+    assert created <= dropped, sorted(created - dropped)
