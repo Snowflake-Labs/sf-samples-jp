@@ -194,6 +194,6 @@ multi-agent-patterns/
 
 ## 作成者 / Author
 
-- 作成者: <github_account>
+- 作成者: [sfc-gh-yshibui](https://github.com/sfc-gh-yshibui)
 - 作成日: 2026-10
 - 最終更新: 2026-10

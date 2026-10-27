@@ -15,13 +15,23 @@ report() { echo "NG: $*"; fail=1; }
 
 # Public files are tracked or trackable files, excluding anything ignored by Git.
 FILES=()
-while IFS= read -r f; do FILES+=("$f"); done < <(git ls-files --cached --others --exclude-standard -- . | sort -u)  # bash 3.2 互換
+while IFS= read -r f; do FILES+=("$f"); done < <(git ls-files --cached --others --exclude-standard -- . | sort -u)  # Bash 3.2 compatible.
 [[ ${#FILES[@]} -gt 0 ]] || { echo "公開対象ファイルが見つかりません"; exit 1; }
 
 if [[ -n "${MAP_DENYLIST:-}" ]]; then
-  if grep -I -n -i -E "$MAP_DENYLIST" -- "${FILES[@]}" >/dev/null 2>&1; then
+  AUTHOR="sfc-gh-""yshi""bui"
+  DENY_HITS=""
+  while IFS= read -r hit; do
+    file="${hit%%:*}"
+    rest="${hit#*:}"
+    content="${rest#*:}"
+    [[ "$file" == "README.md" && "$content" == "- 作成者: [$AUTHOR](https://github.com/$AUTHOR)" ]] && continue
+    [[ "$file" == "README.en.md" && "$content" == "- Author: [$AUTHOR](https://github.com/$AUTHOR)" ]] && continue
+    DENY_HITS="${DENY_HITS}${file}"$'\n'
+  done < <(grep -I -n -i -E "$MAP_DENYLIST" -- "${FILES[@]}" 2>/dev/null || true)
+  if [[ -n "$DENY_HITS" ]]; then
     report "MAP_DENYLIST に一致する文字列があります（ファイル名のみ表示）:"
-    grep -I -l -i -E "$MAP_DENYLIST" -- "${FILES[@]}" | sed 's/^/    /'
+    printf '%s' "$DENY_HITS" | sort -u | sed '/^$/d; s/^/    /'
   fi
 else
   echo "WARNING: MAP_DENYLIST が未設定です（.env に開発アカウント・ユーザー・接続名を | 区切りで設定してください）"

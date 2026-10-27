@@ -189,6 +189,6 @@ All sample data (projects, tasks, meeting notes, and names) is fictitious and cr
 
 ## Author
 
-- Author: <github_account>
+- Author: [sfc-gh-yshibui](https://github.com/sfc-gh-yshibui)
 - Created: 2026-10
 - Last updated: 2026-10
