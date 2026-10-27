@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 07_parallel_fanout/run.sh - 並列レビュー（タスクグラフ）を起動して完了を待ち、逐次ベースラインと比較する。
-# Usage: ./run.sh -c <connection> [-n 1]   （-n はここでは使わない）
+# 07_parallel_fanout/run.sh - Run a parallel review, wait for completion, and compare the sequential baseline.
+# Usage: ./run.sh -c <connection> [-n 1]   (-n is accepted but unused.)
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"
 PROJECT="${MAP_REVIEW_PROJECT:-PRJ-PORTAL}"

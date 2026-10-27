@@ -1,15 +1,20 @@
 # 07 並列ファンアウト／ファンイン（タスクグラフ）
 
-1 つのプロジェクトを **3 つの観点の専門レビュアー（エージェント）が同時に、互いに独立して**調べ、決定論的な集約役が 1 つのレポートにまとめるパターンです。
-並列化には Snowflake の**タスクグラフ**（root → 兄弟タスク → finalizer）を使います。比較用に、同じレビュアーを順番に呼ぶ**逐次ベースライン**も用意しています。
+[English](README.en.md)
+
+3 つの専門エージェントが、それぞれ独立した観点から 1 つのプロジェクトを同時にレビューします。その結果を、決定論的な集約処理が 1 つのレポートにまとめます。
+
+並列実行には Snowflake の**タスクグラフ**を使います。ルートタスク（root）から 3 つの兄弟タスクを起動し、最後にファイナライザー（finalizer）が結果を集約します。
+
+比較用として、同じエージェントを順番に呼ぶ**逐次ベースライン**も用意しています。
 
 ## 1. このパターンで分かること
 
-- 独立した観点（期日・担当・受け入れ基準）を**別々のコンテキスト**で同時に探索し、結果を統合する方法（Scatter-Gather / Map-Reduce）
-- Cortex Agents を**並列に**動かす Snowflake ネイティブな方法: タスクグラフの兄弟タスク。1 つの `SELECT` で行ごとに `DATA_AGENT_RUN` を呼ぶ方法は使えない（リクエスト本文は定数のみ）
-- 集約（fan-in）を LLM にせず、**矛盾解決ルールを持つ決定論的なコード**にする理由
-- 1 つのワーカーが失敗しても止まらず、**partial（欠けた観点つき）のレポート**を出す作り方（finalizer タスク）
-- 並列化の効果は「速さ」より「網羅性」であること。所要時間は短くなりうるが、計算量（エージェント呼び出し回数・トークン）は逐次と同じかそれ以上
+- 独立した観点（期日・担当・受け入れ基準）を**別々のコンテキスト**で同時に調べ、結果を統合する方法（Scatter-Gather / Map-Reduce）
+- タスクグラフの兄弟タスクを使い、Cortex Agents を**並列に**動かす方法
+- 集約（fan-in）を LLM に任せず、**矛盾解決ルールを持つ決定論的なコード**で処理する理由
+- 1 つのワーカーが失敗しても処理全体を止めず、一部の観点が欠けた部分完了レポートを出す方法
+- 並列化は網羅性を高め、待ち時間を短縮できる一方で、呼び出し回数やトークン量は減らないこと
 
 ## 2. 構成図
 
@@ -26,10 +31,12 @@ flowchart LR
   FI --> REP[("REVIEW_REPORTS<br/>APP.V_REVIEW_RUNS")]
 ```
 
-- 3 つのワーカータスクは同じ root の子（兄弟）なので、root が終わると**同時に**起動します。
+- 3 つのワーカータスクは、同じルートタスクの子（兄弟）です。ルートタスクが終わると**同時に**起動します。
 - 各レビュアーには、観点に必要な列だけを渡します（Schedule には担当者を、Ownership には受け入れ基準を、Quality には期日を見せない）。観点同士は互いの結果を見ません。
 - ワーカーの結果はプロシージャの戻り値ではなく、`RUN_ID` をキーに `INTERNAL.REVIEW_FINDINGS` に書きます（プロシージャの戻り値はタスクの戻り値にならないため）。
-- fan-in は **finalizer タスク**です。グラフの他のタスクが成功しても失敗しても必ず最後に実行され、欠けた観点を `partial` として記録します（`AFTER` で 3 ワーカーを待つ形だと、1 つの失敗で fan-in が実行されず、実行が RUNNING のまま残ります）。
+- fan-in は**ファイナライザータスク**です。ほかのタスクの成否にかかわらず、グラフの最後に必ず実行されます。
+- 欠けた観点がある場合は、状態を `PARTIAL` として記録します。
+- 3 つのワーカーを `AFTER` で待つ構成では、1 つの失敗によって fan-in が実行されず、実行状態が `RUNNING` のまま残ります。このため、本パターンではファイナライザーを使います。
 
 ## 3. 作られるオブジェクト
 
@@ -42,24 +49,26 @@ flowchart LR
 | `AGENTS.TMS_QUALITY_REVIEWER_AGENT` | 受け入れ基準の欠落・客観的に確認できない基準を指摘（ツールなし） |
 | `INTERNAL.REVIEW_RUNS` / `REVIEW_FINDINGS` / `REVIEW_REPORTS` | 実行単位、ワーカーごとの結果、統合レポート |
 | `INTERNAL.RUN_REVIEW_WORKER(PERSPECTIVE, RUN_ID, PROJECT_ID)` | ワーカー（所有者権限）。観点 → エージェントの対応は `controller/src/review.py` の `PERSPECTIVES` で固定 |
-| `INTERNAL.AGGREGATE_REVIEW(RUN_ID)` | fan-in（所有者権限、LLM なし） |
-| `INTERNAL.REVIEW_ROOT` / `REVIEW_SCHEDULE` / `REVIEW_OWNERSHIP` / `REVIEW_QUALITY` / `REVIEW_FANIN` | タスクグラフ。root はスケジュールを持たず SUSPEND のまま、子と finalizer は RESUME 済み |
+| `INTERNAL.AGGREGATE_REVIEW(RUN_ID)` | fan-in を行う所有者権限プロシージャ（LLM は使わない） |
+| `INTERNAL.REVIEW_ROOT` / `REVIEW_SCHEDULE` / `REVIEW_OWNERSHIP` / `REVIEW_QUALITY` / `REVIEW_FANIN` | タスクグラフ。ルートタスクはスケジュールを持たず `SUSPEND` のまま。子タスクとファイナライザーは `RESUME` 済み |
 | `APP.START_PROJECT_REVIEW(PROJECT_ID)` | 入口（所有者権限、非同期）。入力検証 → 実行中チェック → `EXECUTE TASK` |
 | `APP.RUN_PROJECT_REVIEW_SEQUENTIAL(PROJECT_ID)` | 逐次ベースライン（所有者権限、同期） |
 | `APP.V_REVIEW_RUNS` / `APP.V_REVIEW_WORKERS` | 結果の確認用ビュー |
 
 実行ロール（`MAP_ROLE`）に許可するのは、2 つの入口プロシージャと 2 つのビュー、3 つのエージェントの USAGE だけです。**タスクの OPERATE は付与しません**。
-タスクはその所有者ロール（setup を実行した `ACCOUNTADMIN`）で動くため、実行ロールが任意の設定でタスクを起動できないよう、入口のプロシージャで `PROJECT_ID` を検証してから `EXECUTE TASK` します。
+タスクは、セットアップを実行した所有者ロール（`ACCOUNTADMIN`）で動きます。実行ロールが任意の設定でタスクを起動できないように、入口のプロシージャで `PROJECT_ID` を検証してから `EXECUTE TASK` を実行します。
 
 ## 4. 構築方法
 
-前提: `00_common` を構築済みであること（エージェントは 07 専用なので、他のパターンには依存しません）。
+前提: `00_common` を構築済みであること（エージェントは `07_parallel_fanout` 専用なので、他のパターンには依存しません）。
 
 ```bash
 ./07_parallel_fanout/setup.sh -c <your_connection>
 ```
 
-setup はコントローラ（`review.py` を含む）の zip を作り直してから、エージェント、テーブル・プロシージャ、タスクグラフ、入口、権限の順に作成します。再実行できます。
+セットアップでは、`review.py` を含むコントローラの ZIP を作り直します。その後、エージェント、テーブルとプロシージャ、タスクグラフ、入口、権限の順に作成します。
+
+スクリプトは再実行できます。
 
 ## 5. 実行と期待結果
 
@@ -72,9 +81,9 @@ setup はコントローラ（`review.py` を含む）の zip を作り直して
 | 並列（タスクグラフ） | 約 21〜23 秒 | 5 件 | HIGH 2、MEDIUM 3 |
 | 逐次ベースライン | 約 39〜41 秒 | 5 件 | HIGH 2、MEDIUM 3 |
 
-- 並列実行では、3 ワーカーの `STARTED_AT` が同じ秒になり、各ワーカーは 6〜9 秒で終わりました。全体の所要時間には、タスクの起動と fan-in の分が加わります。
-- 統合レポートの例: `T-104`（BLOCKED かつ期限切れ、HIGH）、`T-106`（期限切れの高優先度タスク。**schedule と ownership の両方**が指摘し、1 件に統合）、`T-102`（担当者への高優先度タスクの集中）、`T-105` / `T-108`（受け入れ基準なし。quality と ownership）。
-- 失敗時の動作（検証済み）: 1 つのワーカータスクを強制的に失敗させると、finalizer が実行されてレポートは `STATUS = PARTIAL`、`missing_perspectives = ["quality"]` になりました。
+- 並列実行では、3 つのワーカーの `STARTED_AT` が同じ秒になり、それぞれ 6〜9 秒で完了しました。全体の所要時間には、タスクの起動と fan-in にかかる時間も含まれます。
+- 統合レポートでは、`T-104` を「BLOCKED かつ期限切れ」の HIGH、`T-102` を「高優先度タスクの担当者集中」と判定しました。`T-106` は schedule と ownership の両方が指摘し、1 件に統合されています。`T-105` と `T-108` は、quality が受け入れ基準の欠落を、ownership が担当者の未設定を指摘しました。
+- 失敗時の動作も確認しています。1 つのワーカータスクを強制的に失敗させた場合でも、ファイナライザーが実行され、レポートは `STATUS = PARTIAL`、`missing_perspectives = ["quality"]` になりました。
 
 > 並列レビューは非同期です。`START_PROJECT_REVIEW` は `RUN_ID` をすぐに返し、結果は `APP.V_REVIEW_RUNS` の `STATUS` が `RUNNING` から `DONE`（または `PARTIAL`）に変わってから確認します。
 > 同じグラフは同時に 1 つしか実行できないため、実行中（開始から 15 分以内）のレビューがあると、新しいレビューの開始を拒否します。
@@ -115,14 +124,14 @@ USE SCHEMA MULTI_AGENT_PATTERNS.APP;
 CALL START_PROJECT_REVIEW('PRJ-PORTAL');
 SET par_run = (SELECT $1:run_id::STRING FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())));
 
--- 数十秒おきに再実行し、STATUS が DONE になるのを待つ
+-- Re-run every few dozen seconds until STATUS becomes DONE.
 SELECT RUN_ID, MODE, STATUS, TOTAL_SECONDS, TASKS_FLAGGED, BY_SEVERITY FROM V_REVIEW_RUNS WHERE RUN_ID = $par_run;
 
--- 3 ワーカーの開始時刻がほぼ同じであること（= 並列）を確認
+-- Nearly identical worker start times confirm parallel execution.
 SELECT PERSPECTIVE, STATUS, STARTED_AT, FINISHED_AT, SECONDS, FINDINGS FROM V_REVIEW_WORKERS
 WHERE RUN_ID = $par_run ORDER BY STARTED_AT;
 
--- 逐次ベースライン（同期）と比較
+-- Compare with the synchronous sequential baseline.
 CALL RUN_PROJECT_REVIEW_SEQUENTIAL('PRJ-PORTAL');
 SELECT RUN_ID, MODE, TOTAL_SECONDS, TASKS_FLAGGED FROM V_REVIEW_RUNS ORDER BY STARTED_AT DESC LIMIT 2;
 ```
@@ -149,19 +158,20 @@ SELECT TRY_PARSE_JSON(SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
 | 並列化の手段 | タスクグラフの兄弟タスク | `DATA_AGENT_RUN` は本文に定数しか取れず、1 つの SELECT で行ごとに呼べない。タスクは独立したセッションで同時に動く。代償は起動の遅延（数秒）と非同期性 |
 | 分割の単位 | 観点（期日・担当・受け入れ基準） | 互いの文脈を共有しなくてよい単位で切る。各レビュアーに必要な列だけを渡すことで、観点外の指摘（重複）を減らす |
 | 集約役 | 決定論的なコード | 同じタスクへの指摘は 1 件に統合し、最大の重大度を採用する。LLM に集約させると、矛盾の解決が実行ごとに変わり、監査しにくい |
-| 部分的な失敗 | finalizer で必ず集約し、`partial` と欠けた観点を記録 | 1 観点の失敗でレポート全体を失わない。利用側は `partial` を見て再実行を判断する |
+| 部分的な失敗 | ファイナライザーで必ず集約し、`PARTIAL` と欠けた観点を記録 | 1 つの観点が失敗してもレポート全体を失わない。利用側は `PARTIAL` を確認して再実行を判断する |
 | 並列度 | 3 に固定し、同時に 1 レビューだけ | 並列度はコストとレート制限に直結する。観点を増やす場合も、上限と予算（各エージェントの `budget`）を決めてから |
 | 速さと計算量 | 所要時間は約半分、呼び出し回数は同じ | 並列化で減るのは待ち時間であり、トークンやクレジットは減らない（逐次ベースラインと同じ 3 回のエージェント呼び出し） |
-| 使い分け | 02 / 03 との違い | 02 はコントローラが Worker を**順に**呼ぶ。03 はエージェントが呼び出し順を決める。07 は**独立した**観点を**同時に**呼ぶ。Worker 間に依存（Dedupe の結果を Criteria が使うなど）があるなら 07 には向かない |
+| 使い分け | `02_orchestrator_worker` / `03_agent_as_tool` との違い | `02_orchestrator_worker` はコントローラが Worker を**順に**呼ぶ。`03_agent_as_tool` はエージェントが呼び出し順を決める。`07_parallel_fanout` は**独立した**観点を**同時に**呼ぶ。Worker 間に依存（Dedupe の結果を Criteria が使うなど）があるなら `07_parallel_fanout` には向かない |
 
 レポート上の位置づけは **P02 並列ファンアウト／ファンイン**です。タスクグラフは **P10 グラフ／状態機械**の基盤でもあり、ワーカーの後に条件付きのタスク（`WHEN SYSTEM$GET_PREDECESSOR_RETURN_VALUE(...)`）を加えると、グラフ型のワークフローに拡張できます。
 
 ## 7. 自分のユースケースへの応用
 
 - **観点を差し替える**: `agents/*.yaml` と `controller/src/review.py` の `PERSPECTIVES`、`sql/25_tasks.sql` のワーカータスクを同じ名前でそろえて追加・変更します（`tests/test_patterns_07_08.py` が対応関係を検査します）。
-- **観点ではなくデータで分割する**: 地域別・情報源別に同じレビュアーを並べる（セクショニング）、または同じ問いを複数回聞いて多数決する（投票）こともできます。後者は fan-in のルールを「多数決」に変えます。
+- **観点ではなくデータで分割する**: 地域別や情報源別にデータを分け、同じレビュアーを並列に動かすこともできます。
+- **複数の結果から選ぶ**: 同じ問いを複数のワーカーに与え、投票で結果を選ぶ構成にもできます。この場合は、fan-in のルールを多数決に変更します。
 - **定期実行する**: root に `SCHEDULE` を付ければ、毎朝のプロジェクト健全性レポートになります（その場合は `CONFIG` の既定値を `ALTER TASK ... SET CONFIG` で与える）。
-- **人の判断につなぐ**: HIGH の指摘を `INTERNAL.PROPOSED_ACTIONS` に提案として書き、04 の検証と人の承認に回せます。
+- **人の判断につなぐ**: HIGH の指摘を `INTERNAL.PROPOSED_ACTIONS` に提案として書き、`04_verifier_human_in_the_loop` の検証と人の承認に回せます。
 
 ## 8. 削除
 

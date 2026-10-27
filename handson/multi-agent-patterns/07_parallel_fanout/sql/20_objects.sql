@@ -1,7 +1,7 @@
 -- 07_parallel_fanout/sql/20_objects.sql
--- 並列ファンアウト／ファンイン: 結果テーブル、ワーカー・集約プロシージャ、確認用ビュー。
--- ワーカーはタスクグラフの兄弟タスクとして同時に動き、結果は RUN_ID をキーに REVIEW_FINDINGS へ書く
--- （プロシージャの戻り値はタスクの戻り値にならないため、fan-in はテーブルから読む）。
+-- Parallel fan-out/fan-in: result tables, worker and aggregation procedures, and inspection views.
+-- Sibling worker tasks run concurrently and write results to REVIEW_FINDINGS by RUN_ID.
+-- Procedure return values are not task return values, so fan-in reads the result table.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS <% db %>.INTERNAL.REVIEW_REPORTS (
 ) COMMENT = 'Pattern 07: aggregated (fan-in) review report';
 
 -------------------------------------------------------------------------------
--- ワーカー: 観点 → エージェントは review.PERSPECTIVES で固定。エージェントの失敗は例外にせず ERROR を記録する。
--- 万一このプロシージャ自体が失敗しても、fan-in は finalizer タスクなので必ず走り、レポートは partial になる。
+-- Worker: review.PERSPECTIVES fixes each perspective to one agent. Record agent failures as ERROR instead of raising.
+-- If this procedure itself fails, the finalizer still runs fan-in and creates a partial report.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE <% db %>.INTERNAL.RUN_REVIEW_WORKER(PERSPECTIVE STRING, RUN_ID STRING, PROJECT_ID STRING)
 RETURNS STRING
@@ -59,7 +59,7 @@ DB = "<% db %>"
 
 
 def run(session, perspective, run_id, project_id):
-    # エポックミリ秒で受け取る（datetime で戻すとタイムゾーンが落ちるため）
+    # Use epoch milliseconds because returning a datetime loses timezone information.
     started_ms = session.sql("SELECT DATE_PART(epoch_millisecond, CURRENT_TIMESTAMP()) AS T").collect()[0]["T"]
     t0 = time.time()
     agent, status, findings, error = None, "ERROR", [], None
@@ -88,7 +88,7 @@ def run(session, perspective, run_id, project_id):
 $$;
 
 -------------------------------------------------------------------------------
--- fan-in（決定論）: 同じタスクへの指摘は統合し、最大の重大度を採用。欠けた観点があれば partial。
+-- Deterministic fan-in: merge findings per task, keep the highest severity, and mark missing perspectives as partial.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE <% db %>.INTERNAL.AGGREGATE_REVIEW(RUN_ID STRING)
 RETURNS VARIANT
@@ -127,7 +127,7 @@ def run(session, run_id):
 $$;
 
 -------------------------------------------------------------------------------
--- 確認用ビュー
+-- Inspection views.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW <% db %>.APP.V_REVIEW_RUNS
 COMMENT = 'Pattern 07: review runs with their aggregated report'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 08_blackboard/teardown.sh - このパターンのタスク・ストリーム・プロシージャ・テーブル・ビューだけを削除（共通基盤は残す）。
+# 08_blackboard/teardown.sh - Delete this pattern's objects only; keep the common foundation.
 # Usage: ./teardown.sh -c <connection> --confirm
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

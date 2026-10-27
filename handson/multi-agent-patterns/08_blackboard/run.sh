@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 08_blackboard/run.sh - 会議メモを掲示板に投稿し、購読者が PROPOSALS を書くまで待ってタイムラインを表示する。
-# Usage: ./run.sh -c <connection>   （MAP_BOARD_NOTE で投稿する会議メモを変更可、既定 N-003）
+# 08_blackboard/run.sh - Post a meeting note, wait for PROPOSALS, and display the timeline.
+# Usage: ./run.sh -c <connection>   (MAP_BOARD_NOTE overrides the default note N-003.)
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"
 NOTE="${MAP_BOARD_NOTE:-N-003}"

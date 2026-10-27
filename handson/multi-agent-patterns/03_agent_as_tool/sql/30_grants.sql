@@ -1,5 +1,5 @@
 -- 03_agent_as_tool/sql/30_grants.sql
--- このパターンのエージェントとプロシージャを実行ロールに許可する。
+-- Grant the execution role access to this pattern's agent and procedures.
 
 USE ROLE ACCOUNTADMIN;
 

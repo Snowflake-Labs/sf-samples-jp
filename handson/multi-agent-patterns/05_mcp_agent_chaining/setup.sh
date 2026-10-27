@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 05_mcp_agent_chaining/setup.sh - MCP サーバー経由でエージェントを呼ぶ構成を作成（単独で動く、再実行可能）。
+# 05_mcp_agent_chaining/setup.sh - Create an idempotent standalone agent-chaining setup through MCP servers.
 # Usage: ./setup.sh -c <connection>
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

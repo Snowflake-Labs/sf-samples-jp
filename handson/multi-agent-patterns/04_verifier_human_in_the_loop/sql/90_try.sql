@@ -1,14 +1,14 @@
 -- 04_verifier_human_in_the_loop/sql/90_try.sql
--- Verifier + 人間承認を試す。提案は「どのエージェントが作ったか」に依らず同じゲートを通る。
--- ここでは他パターンに依存しないよう、提案を INSERT で直接作る（エージェントの提案と同じ形式）。
+-- Try Verifier + human approval. Every proposal follows the same gate regardless of its source agent.
+-- Insert proposals directly in the same format as agent proposals to avoid dependencies on other patterns.
 
--- 実行ロール（最小権限）で動かす。書き込みは所有者権限プロシージャだけが行う。
+-- Run with the least-privilege execution role; only owner-rights procedures can write.
 USE ROLE <% role %>;
 USE SECONDARY ROLES NONE;
 USE WAREHOUSE <% wh %>;
 USE SCHEMA <% db %>.APP;
 
--- 準備: 良い提案 1 件（CREATE_TASK）と HIGH リスクの変更 1 件（UPDATE_TASK）
+-- Prepare one valid CREATE_TASK proposal and one HIGH-risk UPDATE_TASK proposal.
 SET run_id = (SELECT 'TRY-' || UUID_STRING());
 SET good_id = (SELECT 'A-' || UUID_STRING());
 SET risky_id = (SELECT 'A-' || UUID_STRING());
@@ -25,10 +25,10 @@ SELECT $risky_id, $run_id, 'UPDATE_TASK', 'T-106', PARSE_JSON('{"priority":"CRIT
        PARSE_JSON('[{"source_type":"REQUEST","source_id":"try","quote":"Change the priority of T-106 to CRITICAL"}]'),
        0.9, 'HIGH', 'PROPOSED';
 
--- 1. 承認前の適用は拒否される（ok = false）
+-- 1. Applying before approval is rejected (ok = false).
 CALL APPLY_PROPOSAL($good_id);
 
--- 2. 検証: 決定論チェック → Verifier エージェント。期待値 FINAL_STATUS = PASS, ACTION_STATUS = VERIFIED
+-- 2. Verify: deterministic checks -> Verifier agent. Expect FINAL_STATUS = PASS and ACTION_STATUS = VERIFIED.
 CALL RUN_VERIFICATION($good_id);
 SET verify_qid = LAST_QUERY_ID();
 SELECT $1:deterministic:passed::BOOLEAN AS DETERMINISTIC_PASSED, $1:agent:verdict::STRING AS VERIFIER_VERDICT,
@@ -37,17 +37,17 @@ FROM TABLE(RESULT_SCAN($verify_qid));
 SELECT c.value:name::STRING AS CHECK_NAME, c.value:passed::BOOLEAN AS PASSED, c.value:detail::STRING AS DETAIL
 FROM TABLE(RESULT_SCAN($verify_qid)) r, LATERAL FLATTEN(r.$1:deterministic:checks) c;
 
--- 3. 人間が承認 → 適用（新しいタスク ID が返る）。もう一度適用しても何も起きない
+-- 3. Human approval -> apply and return a new task ID. Applying again is a no-op.
 CALL DECIDE_PROPOSAL($good_id, 'APPROVE');
 CALL APPLY_PROPOSAL($good_id);
 CALL APPLY_PROPOSAL($good_id);
 
--- 4. HIGH リスクの変更: チェックは通っても NEEDS_HUMAN（HIGH_RISK_ACTION）。人間が破棄する
+-- 4. HIGH-risk change: checks pass but return NEEDS_HUMAN (HIGH_RISK_ACTION); the human discards it.
 CALL RUN_VERIFICATION($risky_id);
 SELECT $1:final_status::STRING AS FINAL_STATUS, $1:issues AS ISSUES FROM TABLE(RESULT_SCAN(LAST_QUERY_ID(-1)));
 CALL DECIDE_PROPOSAL($risky_id, 'DISCARD');
 
--- 5. 監査ログとキュー
+-- 5. Inspect the audit log and queue.
 SELECT CREATED_AT, ACTOR, EVENT_TYPE, OBJECT_TYPE, OBJECT_ID FROM <% db %>.INTERNAL.AUDIT_EVENTS
 WHERE RUN_ID = $run_id ORDER BY CREATED_AT;
 SELECT ACTION_ID, STATUS, ACTION_TYPE, TARGET_TASK_ID, VERIFICATION FROM V_REVIEW_QUEUE

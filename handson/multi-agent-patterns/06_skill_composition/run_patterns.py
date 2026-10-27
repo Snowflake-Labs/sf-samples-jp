@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""パターン 06: P0〜P4 を N 回ずつ実行し、どのスキル本文が回答に反映されたかを判定する。
+"""Run pattern 06 cases P0-P4 N times and detect which skill bodies affected the answer.
 
-P-ALPHA-3141 は親スキル本文だけ、C-BRAVO-2718 はサブスキル（house style）本文だけにある。
-description には含まれないので、回答にコードがあれば、その SKILL.md 本文を読み込んだことになる。
+P-ALPHA-3141 appears only in the parent skill body, while C-BRAVO-2718 appears only in the child
+(house style) skill body. Neither appears in a description, so a code word in an answer proves that
+the corresponding SKILL.md body was loaded.
 Usage: python3 run_patterns.py -c <connection> [-n 3]
 """
 import json

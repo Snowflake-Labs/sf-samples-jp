@@ -1,5 +1,5 @@
 -- 02_orchestrator_worker/sql/99_teardown.sql
--- このパターンが作ったエージェントとプロシージャだけを削除する（共通基盤は残す）。
+-- Delete only this pattern's agents and procedure; keep the common foundation.
 
 USE ROLE ACCOUNTADMIN;
 

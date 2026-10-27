@@ -1,5 +1,5 @@
 -- 02_orchestrator_worker/sql/30_grants.sql
--- このパターンのエージェントとプロシージャを実行ロールに許可する。
+-- Grant the execution role access to this pattern's agents and procedure.
 
 USE ROLE ACCOUNTADMIN;
 

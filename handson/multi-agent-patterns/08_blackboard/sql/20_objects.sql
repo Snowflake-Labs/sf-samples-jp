@@ -1,6 +1,6 @@
 -- 08_blackboard/sql/20_objects.sql
--- ブラックボード: 追記のみの掲示板、購読者ごとの受信箱、購読者ごとのビューとストリーム、確認用ビュー。
--- エージェント同士は直接やり取りせず、掲示板の状態の変化（新しい項目）に反応して動く。
+-- Blackboard: append-only items, per-subscriber inboxes, filtered views and streams, and inspection views.
+-- Agents never communicate directly; they react to new items on the board.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS <% db %>.INTERNAL.BOARD_INBOX (
     PRIMARY KEY (SUBSCRIBER, ITEM_ID)
 ) COMMENT = 'Pattern 08: per-subscriber inbox (idempotent processing state)';
 
--- 購読者ごとに「消費する種類だけ」を見るビューとストリーム。自分が書いた種類では起動しない（ループ防止）。
+-- Each subscriber sees only consumed kinds through its view and stream; outputs cannot retrigger the same subscriber.
 CREATE OR REPLACE VIEW <% db %>.INTERNAL.BOARD_V_DECOMPOSE
 COMMENT = 'Pattern 08: board items consumed by the decompose subscriber'
 AS SELECT ITEM_ID, RUN_ID, KIND FROM <% db %>.INTERNAL.BOARD_ITEMS WHERE KIND IN ('NOTE');

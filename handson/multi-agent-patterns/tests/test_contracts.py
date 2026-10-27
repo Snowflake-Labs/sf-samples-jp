@@ -1,6 +1,6 @@
-"""コントローラの契約テスト（オフライン、Snowflake 接続不要）。Run: python3 -m pytest tests -q
+"""Offline controller contract tests; no Snowflake connection required. Run: pytest tests -q
 
-元資材の契約テストを本資材の配置（controller/、各パターンの agents/ と sql/）に合わせたもの。
+Adapted from the source material's contract tests for this project's controller/, agents/, and sql/ layout.
 """
 import json
 import pathlib

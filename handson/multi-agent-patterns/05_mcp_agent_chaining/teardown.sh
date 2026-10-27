@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 05_mcp_agent_chaining/teardown.sh - パターン 05 のデータベースだけを削除（共通ウェアハウスは残す）。
+# 05_mcp_agent_chaining/teardown.sh - Delete only the pattern 05 database; keep the shared warehouse.
 # Usage: ./teardown.sh -c <connection> --confirm
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

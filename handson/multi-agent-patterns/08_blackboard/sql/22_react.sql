@@ -1,6 +1,6 @@
 -- 08_blackboard/sql/22_react.sql
--- 購読者の処理（所有者権限）。購読者 → 書ける種類の対応表は controller/src/board.py の SUBSCRIBERS で固定。
--- 例外は外に出さず受信箱に ERROR を記録する（タスクが失敗して同じデータで再実行され続けるのを防ぐ）。
+-- Owner-rights subscriber processing. controller/src/board.py SUBSCRIBERS fixes each subscriber's writable kinds.
+-- Record exceptions as ERROR in the inbox instead of failing the task and repeatedly processing the same data.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;

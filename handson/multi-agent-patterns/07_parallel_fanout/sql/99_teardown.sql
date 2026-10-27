@@ -1,5 +1,5 @@
 -- 07_parallel_fanout/sql/99_teardown.sql
--- パターン 07 が作ったものだけを削除する（共通基盤は残す）。タスクは子から先に停止・削除する。
+-- Delete only pattern 07 objects and keep the common foundation. Suspend and drop child tasks first.
 
 USE ROLE ACCOUNTADMIN;
 

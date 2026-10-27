@@ -1,5 +1,5 @@
 -- 00_common/sql/02_tables.sql
--- 共通基盤: 業務テーブル（架空のタスク管理システム）と制御プレーン（提案・検証・監査・トレース）。
+-- Common foundation: business tables for a fictional task management system and the proposal/control plane.
 -- Tables for the task management system and the agent control plane. Idempotent.
 
 USE ROLE ACCOUNTADMIN;

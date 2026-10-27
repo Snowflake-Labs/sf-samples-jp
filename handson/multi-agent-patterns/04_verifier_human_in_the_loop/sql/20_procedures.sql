@@ -1,5 +1,5 @@
 -- 04_verifier_human_in_the_loop/sql/20_procedures.sql
--- コントローラプロシージャ: 検証（決定論チェック → Verifier）、人間の承認・破棄、適用。
+-- Controller procedures for verification, human approval or discard, and application.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -66,4 +66,3 @@ from src.config import Config
 def run(session, action_id):
     return controller.apply(session, Config("<% db %>"), action_id, controller.current_user(session))
 $$;
-

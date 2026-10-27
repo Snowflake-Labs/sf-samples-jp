@@ -1,5 +1,5 @@
 -- 08_blackboard/sql/28_entry.sql
--- 実行ロールに公開する入口（所有者権限）: 会議メモを NOTE 項目として掲示板に投稿する。以降は購読者が自律的に動く。
+-- Owner-rights entry point: post a meeting note as NOTE; subscribers react asynchronously afterward.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;

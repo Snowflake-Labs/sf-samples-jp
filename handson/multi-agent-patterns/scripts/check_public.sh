@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# check_public.sh - 公開前チェック。コミット前に実行し、0 件であることを確認する。
-#   1. MAP_DENYLIST（.env、| 区切り）に書いた開発環境の識別子が、公開対象ファイルに含まれていないか
-#   2. ホスト名・秘密鍵・パスワードらしき文字列
-#   3. 公開してはいけないファイル（.env, results/, __pycache__/, *.zip）が git に追加されていないか
-#   4. 10MB を超えるファイル
-#   5. 静的テスト（tests/）: 命名規約（snow を含む名前の禁止）、テンプレート、構成
+# check_public.sh - Pre-publication checks. Run before committing and require zero findings.
+#   1. Development identifiers from the pipe-separated MAP_DENYLIST in .env
+#   2. Hostnames, private keys, and password-like strings
+#   3. Files that must not be tracked: .env, results/, __pycache__/, and *.zip
+#   4. Files larger than 10 MB
+#   5. Static tests for naming rules, templates, and repository structure
 # Usage: scripts/check_public.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,7 +13,7 @@ if [[ -f .env ]]; then set -a; source .env; set +a; fi
 fail=0
 report() { echo "NG: $*"; fail=1; }
 
-# 公開対象 = git が追跡する or 追跡しうるファイル（.gitignore で除外されたものを除く）
+# Public files are tracked or trackable files, excluding anything ignored by Git.
 FILES=()
 while IFS= read -r f; do FILES+=("$f"); done < <(git ls-files --cached --others --exclude-standard -- . | sort -u)  # bash 3.2 互換
 [[ ${#FILES[@]} -gt 0 ]] || { echo "公開対象ファイルが見つかりません"; exit 1; }

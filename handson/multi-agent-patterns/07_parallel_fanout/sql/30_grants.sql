@@ -1,5 +1,5 @@
 -- 07_parallel_fanout/sql/30_grants.sql
--- 実行ロールには入口のプロシージャと確認用ビューだけを許可する（タスク・ワーカー・集約は所有者専用）。
+-- Grant only entry procedures and inspection views; tasks, workers, and aggregation remain owner-only.
 
 USE ROLE ACCOUNTADMIN;
 

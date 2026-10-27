@@ -1,5 +1,5 @@
 -- 00_common/sql/01_account.sql
--- 共通基盤: ロール・ウェアハウス・データベース・スキーマ（APP / AGENTS / INTERNAL）を作成する。再実行可能。
+-- Common foundation: create the role, warehouse, database, and APP / AGENTS / INTERNAL schemas. Idempotent.
 -- Creates workshop-owned account objects: role, warehouse, database, schemas.
 -- Idempotent. Requires ACCOUNTADMIN (or an equivalent role).
 

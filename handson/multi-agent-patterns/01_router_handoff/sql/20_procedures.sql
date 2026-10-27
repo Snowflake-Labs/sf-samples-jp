@@ -1,5 +1,5 @@
 -- 01_router_handoff/sql/20_procedures.sql
--- コントローラプロシージャ（呼び出し元権限）: ルーター → 専門エージェント 1 つ（または人間）。
+-- Caller-rights controller procedure: router -> one specialist agent or a human.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -27,4 +27,3 @@ def run(session, request_text, project_id):
         return {"error": "REQUEST_TEXT is empty"}
     return controller.handle_request(session, Config("<% db %>"), request_text, project_id or "PRJ-PORTAL")
 $$;
-

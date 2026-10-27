@@ -1,7 +1,7 @@
 -- 00_common/sql/06_controller.sql
--- 共通基盤: コントローラ（controller/src/*.py）をステージ上で zip 化し、確認用ビューを作る。
--- setup.sh が controller/src/*.py を @<% db %>.AGENTS.APP_STAGE/lib/src/ にアップロードしてから実行する。
--- パターンごとのコントローラプロシージャ（APP.RUN_* など）は各パターンの sql/20_procedures.sql で作成する。
+-- Common foundation: package controller/src/*.py on the stage and create inspection views.
+-- Run after setup.sh uploads controller/src/*.py to @<% db %>.AGENTS.APP_STAGE/lib/src/.
+-- Each pattern creates its controller procedures, such as APP.RUN_*, in sql/20_procedures.sql.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -47,7 +47,7 @@ $$;
 CALL <% db %>.AGENTS.BUILD_CONTROLLER_ZIP();
 
 -------------------------------------------------------------------------------
--- 確認用ビュー（提案キュー・トレース・タスクボード）
+-- Inspection views for the proposal queue, trace, and task board.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW <% db %>.APP.V_REVIEW_QUEUE
 COMMENT = 'Proposed actions with their latest verification result'

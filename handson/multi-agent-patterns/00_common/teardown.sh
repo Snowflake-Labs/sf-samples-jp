@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 00_common/teardown.sh - 共通基盤とパターン 01-04 のすべて（DB）、ウェアハウス、ロールを削除。
+# 00_common/teardown.sh - Delete the common database, patterns 01-04, warehouse, and role.
 # Usage: ./teardown.sh -c <connection> --confirm
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

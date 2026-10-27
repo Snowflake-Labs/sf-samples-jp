@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 06_skill_composition/setup.sh - スキル / サブスキル構成を作成（単独で動く、再実行可能）。
+# 06_skill_composition/setup.sh - Create an idempotent standalone skill/subskill setup.
 # Usage: ./setup.sh -c <connection>
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

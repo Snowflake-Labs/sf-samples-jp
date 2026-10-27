@@ -1,7 +1,8 @@
-"""パターン 05 / 06 の run_patterns.py が使う共通ヘルパー。
+"""Shared helpers used by the run_patterns.py scripts for patterns 05 and 06.
 
-DATA_AGENT_RUN でエージェントを 1 回呼び、応答を要約する。results/ に保存する JSON からは、
-思考ブロック（署名を含む）・リクエスト ID・クエリ ID など環境を特定できる値を取り除く。
+Call an agent once through DATA_AGENT_RUN and summarize its response. Before saving JSON under
+results/, remove thinking blocks (including signatures), request IDs, query IDs, and other values
+that could identify the execution environment.
 """
 from __future__ import annotations
 
@@ -37,7 +38,7 @@ def parse_args(description: str, default_db_env: str, default_db: str) -> argpar
 
 def run_agent(args: argparse.Namespace, agent: str, prompt: str) -> tuple[dict[str, Any], int, float]:
     body = json.dumps({"messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}]})
-    # 05 / 06 は ACCOUNTADMIN で実行する前提（接続の既定ロールに依存しない）
+    # Patterns 05 and 06 run as ACCOUNTADMIN; do not depend on the connection's default role.
     sql = f"USE ROLE ACCOUNTADMIN; USE WAREHOUSE {args.wh}; SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN('{args.db}.LAB.{agent}', $${body}$$) AS R"
     started = time.time()
     p = subprocess.run(["snow", "sql", "-c", args.connection, "--format", "json", "-q", sql],
@@ -53,7 +54,7 @@ def run_agent(args: argparse.Namespace, agent: str, prompt: str) -> tuple[dict[s
 
 
 def sanitize(obj: Any) -> Any:
-    """保存前に、環境を特定できる値と思考ブロックを取り除く。"""
+    """Remove environment-identifying values and thinking blocks before saving."""
     if isinstance(obj, dict):
         if obj.get("type") == "thinking":
             return {"type": "thinking", "thinking": "(removed)"}
@@ -61,7 +62,7 @@ def sanitize(obj: Any) -> Any:
     if isinstance(obj, list):
         return [sanitize(v) for v in obj]
     if isinstance(obj, str) and obj.lstrip()[:1] in "{[":
-        # MCP のツール結果は「JSON 文字列」や「NDJSON（1 行 1 JSON）」で入れ子になる
+        # MCP tool results can contain nested JSON strings or NDJSON (one JSON object per line).
         try:
             return json.dumps(sanitize(json.loads(obj)), ensure_ascii=False)
         except json.JSONDecodeError:

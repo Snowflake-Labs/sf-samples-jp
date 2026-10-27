@@ -1,5 +1,5 @@
 -- 00_common/sql/03_seed.sql
--- 共通基盤: 架空のシードデータ（人名・案件はすべて架空）。MERGE なので再実行可能。
+-- Common foundation: fictional seed data. All people and projects are fictional; MERGE makes this idempotent.
 -- Deterministic seed data. MERGE keeps the file idempotent and never deletes
 -- participant-created rows. Due dates are relative to CURRENT_DATE so that
 -- "overdue" examples stay overdue on any workshop day; rerunning setup re-bases the
@@ -57,7 +57,7 @@ VALUES
     (s.TASK_ID, s.PROJECT_ID, s.TITLE, s.DESCRIPTION, s.STATUS, s.PRIORITY, s.ASSIGNEE, s.DUE_DATE,
      s.ACCEPTANCE_CRITERIA, 'SEED', NULL, CURRENT_TIMESTAMP());
 
--- Orchestrator/Worker の配線（パターン 02 のコントローラが参照）。
+-- Orchestrator/Worker wiring read by the pattern 02 controller.
 MERGE INTO <% db %>.APP.WORKER_PLAN t
 USING (
     SELECT column1 AS STEP_NO, column2 AS WORKER, column3 AS AGENT_NAME, column4 AS REQUEST_TEMPLATE

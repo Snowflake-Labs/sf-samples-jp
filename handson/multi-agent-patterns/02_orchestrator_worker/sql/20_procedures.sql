@@ -1,5 +1,5 @@
 -- 02_orchestrator_worker/sql/20_procedures.sql
--- コントローラプロシージャ（呼び出し元権限）: Decomposer → APP.WORKER_PLAN の Worker → 集約。
+-- Caller-rights controller procedure: Decomposer -> workers from APP.WORKER_PLAN -> aggregation.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -25,4 +25,3 @@ from src.config import Config
 def run(session, note_id):
     return controller.process_note(session, Config("<% db %>"), note_id)
 $$;
-

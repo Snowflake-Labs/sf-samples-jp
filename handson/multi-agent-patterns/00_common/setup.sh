@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 00_common/setup.sh - パターン 01-04 の共通基盤を作成（再実行可能）。
+# 00_common/setup.sh - Create the idempotent common foundation for patterns 01-04.
 # Usage: ./setup.sh -c <connection>
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"
@@ -15,13 +15,13 @@ find "$MAP_ROOT/controller" -name "__pycache__" -type d -prune -exec rm -rf {} +
 for f in "$MAP_ROOT"/controller/src/*.py; do
   put_file "$f" "@${DB}.AGENTS.APP_STAGE/lib/src/" || die "upload of $f failed"
 done
-# 06_controller.sql が BUILD_CONTROLLER_ZIP を作成・実行する（以降のパターンは deploy_controller で更新）
+# 06_controller.sql creates and runs BUILD_CONTROLLER_ZIP; later patterns refresh it through deploy_controller.
 run_sql "$HERE/sql/06_controller.sql"
 run_sql "$HERE/sql/08_grants.sql"
 run_sql "$HERE/sql/09_smoke_tests.sql"
 info "Smoke tests passed"
 
-# Cortex Agents は既定ウェアハウスを必要とする。未設定なら案内だけ出す（ユーザー設定は変更しない）。
+# Cortex Agents require a default warehouse. Print guidance when absent; never alter the user.
 USR="$(sqlq "SELECT CURRENT_USER() AS U")"; USER_NAME="$(jfield "$USR" "d[0]['U']")"
 DESC="$(sqlq "DESC USER IDENTIFIER('\"$USER_NAME\"')")"
 DEF_WH="$(jfield "$DESC" "next((r['value'] for r in d if r['property']=='DEFAULT_WAREHOUSE'), 'null')")"

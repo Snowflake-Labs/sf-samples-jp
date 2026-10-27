@@ -1,12 +1,14 @@
 # 02 Orchestrator / Worker（コントローラ型）
 
-Python コントローラがオーケストレーターになり、会議メモを Worker エージェントに順に渡して、結果を集約します。
-前提: [`00_common`](../00_common/)。エージェント型の同じ処理は [03](../03_agent_as_tool/)。比較: [パターン比較表](../README.md#comparison)
+[English](README.en.md)
+
+Python コントローラがオーケストレーターとなり、会議メモを複数の Worker エージェントに順番に渡して結果を集約します。
+前提は [`00_common`](../00_common/) です。同じ処理をエージェント型で実装した例は [`03_agent_as_tool`](../03_agent_as_tool/) を参照してください。全体の違いは [パターン比較表](../README.md#comparison) にまとめています。
 
 ## 1. このパターンで分かること
 
 - 1 つの作業（会議メモ → タスク提案）を、役割の違う複数のエージェントに分担させる方法
-- 各 Worker に**必要な情報だけ**を渡す方法（例: Dedupe には会議メモ本文を渡さない）
+- 各 Worker に**必要な情報だけ**を渡す方法（例: 重複判定を担う Dedupe には会議メモの本文を渡さない）
 - Worker の出力を契約で検証し、**根拠のない候補を捨ててから**集約する方法
 - どの Worker をどの順で呼ぶかを、テーブル（`APP.WORKER_PLAN`）で配線する方法
 
@@ -38,7 +40,7 @@ sequenceDiagram
 | `AGENTS.TMS_DEDUPE_AGENT` | 既存タスクとの重複を判定（`search_similar_tasks`） |
 | `AGENTS.TMS_CRITERIA_AGENT` | タイトル接頭辞・優先度・受け入れ基準を付ける（`get_project_policy`） |
 | `APP.RUN_MEETING_NOTE(NOTE_ID)` | コントローラ（呼び出し元権限） |
-| `APP.WORKER_PLAN`（00_common で作成） | Worker の呼び出し順と依頼テンプレート |
+| `APP.WORKER_PLAN`（`00_common` で作成） | Worker の呼び出し順と依頼テンプレート |
 
 ## 4. 構築方法
 
@@ -52,11 +54,9 @@ SELECT STEP_NO, WORKER, AGENT_NAME, REQUEST_TEMPLATE FROM APP.WORKER_PLAN ORDER 
 -- 2 | criteria | TMS_CRITERIA_AGENT | Project: {project_id}\nCandidates JSON:\n{candidates_json}
 ```
 
-`contracts.render_worker_request` は、テンプレートが使える変数を `{project_id}`, `{note_id}`, `{candidates_json}` に限定しています（会議メモ本文 `{note_text}` は使えない）。
-Worker が本文中の注入行を読む機会そのものを無くすためです。
+`contracts.render_worker_request` は、テンプレートで使える変数を `{project_id}`, `{note_id}`, `{candidates_json}` に限定しています。会議メモの本文を表す `{note_text}` は使用できません。これにより、Worker が本文中の注入行を読む機会をなくしています。
 
-集約（`contracts.build_note_actions`）では、Decomposer の候補に Dedupe の判定（create / link / skip）と Criteria の補完を合わせ、
-`CREATE_TASK` / `LINK_DUPLICATE` / `SKIP` の提案を作ります。
+集約処理（`contracts.build_note_actions`）は、Decomposer が抽出した候補に、Dedupe の判定（create / link / skip）と Criteria の補完情報を組み合わせます。その結果から、`CREATE_TASK` / `LINK_DUPLICATE` / `SKIP` の提案を作ります。
 
 ## 5. 実行と期待結果
 
@@ -67,8 +67,9 @@ Worker が本文中の注入行を読む機会そのものを無くすためで�
 | `CREATE_TASK`: `[PORTAL] Prepare the v2.0 release checklist` | `Sarah will prepare the v2.0 release checklist.` |
 | `LINK_DUPLICATE`: 既存 `T-108`（リリースノート） | `Steve will write the release notes for v2.0.` |
 
-`IGNORE ALL PREVIOUS INSTRUCTIONS ...` の行は候補になりません。2026-10-27 の検証では期待どおりの 2 件で、
-エージェント時間は Decomposer 約 8.6 秒、Dedupe 約 10 秒、Criteria 約 9.5 秒でした。トレースでは、Worker を呼んだのがコントローラであることが確認できます。
+`IGNORE ALL PREVIOUS INSTRUCTIONS ...` の行は候補になりません。2026-10-27 の検証では、期待どおり 2 件の提案が作成されました。
+
+検証時の所要時間は、Decomposer が約 8.6 秒、Dedupe が約 10 秒、Criteria が約 9.5 秒でした。これは参考値であり、応答時間は変動します。トレースでは、各 Worker をコントローラが呼び出したことを確認できます。
 
 ### Snowsight で試す
 
@@ -136,8 +137,8 @@ JSON の中に改行や `"` を含めるときは、上のように `\n` と `\"
 
 - **順序と入力をコードが保証**: どの Worker をいつ、何を渡して呼ぶかが決定的です。テストもしやすくなります。
 - **コンテキスト分離**: 各 Worker は自分の指示とツールだけを持ち、他の Worker の推論過程を見ません。
-- **根拠の検証**: 候補の引用が本文に無ければ捨てます。LLM の「でっち上げ」を構造的に排除します。
-- トレードオフ: 手順を変えるにはコード（または配線テーブル）の変更が必要です。柔軟性を優先するなら [03](../03_agent_as_tool/) を検討してください。
+- **根拠の検証**: 候補の引用が本文に存在しない場合は、その候補を破棄します。これにより、本文に根拠のない内容が後続処理へ渡るのを防ぎます。
+- トレードオフ: 手順を変えるにはコード（または配線テーブル）の変更が必要です。柔軟性を優先するなら [`03_agent_as_tool`](../03_agent_as_tool/) を検討してください。
 
 ## 7. 自分のユースケースへの応用
 
@@ -147,8 +148,10 @@ JSON の中に改行や `"` を含めるときは、上のように `\n` と `\"
 ## 8. 削除
 
 ```bash
-./teardown.sh -c <your_connection> --confirm   # エージェント 3 つとプロシージャを削除（03 はこの Worker を使うので先に削除）
+./teardown.sh -c <your_connection> --confirm
 ```
+
+`03_agent_as_tool` は、このパターンの Worker エージェントを再利用します。両方を構築している場合は、先に `03_agent_as_tool` を削除してください。
 
 ## 9. 参考リンク
 

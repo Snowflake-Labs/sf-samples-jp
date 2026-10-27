@@ -1,6 +1,6 @@
 -- 03_agent_as_tool/sql/20_procedures.sql
--- エージェントからエージェントを呼ぶラッパー（所有者権限、呼び先は固定）と、
--- オーケストレーターエージェントの返答を検証して提案に保存するコントローラプロシージャ。
+-- Owner-rights wrappers with fixed targets for agent-to-agent calls, plus a controller procedure
+-- that validates the orchestrator agent response and saves proposals.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -126,4 +126,3 @@ from src.config import Config
 def run(session, note_id):
     return controller.process_note_orchestrated(session, Config("<% db %>"), note_id)
 $$;
-

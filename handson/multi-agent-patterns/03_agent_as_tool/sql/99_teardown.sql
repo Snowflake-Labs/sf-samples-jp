@@ -1,5 +1,5 @@
 -- 03_agent_as_tool/sql/99_teardown.sql
--- このパターンが作ったエージェントとプロシージャだけを削除する（共通基盤は残す）。
+-- Delete only this pattern's agent and procedures; keep the common foundation.
 
 USE ROLE ACCOUNTADMIN;
 

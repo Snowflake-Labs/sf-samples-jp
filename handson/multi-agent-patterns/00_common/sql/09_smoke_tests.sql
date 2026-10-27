@@ -1,5 +1,5 @@
 -- 00_common/sql/09_smoke_tests.sql
--- LLM を呼ばない決定論的チェック。どれかが失敗すると最後の文がゼロ除算で失敗し、setup.sh が止まる。
+-- Deterministic checks with no LLM calls. Any failure triggers division by zero in the final statement and stops setup.sh.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;

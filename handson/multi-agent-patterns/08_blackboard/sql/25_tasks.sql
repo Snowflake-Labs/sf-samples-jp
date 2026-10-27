@@ -1,6 +1,6 @@
 -- 08_blackboard/sql/25_tasks.sql
--- 購読者ごとのトリガータスク（スケジュール無し、ストリームにデータが来たときだけ動く）。
--- データが無いあいだは実行されない。タスクは所有者ロール（このファイルを実行したロール）で動く。
+-- Per-subscriber triggered tasks with no schedule; they run only when stream data arrives.
+-- No data means no execution. Tasks run as their owner role, which is the role that executes this file.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;

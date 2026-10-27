@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 01_router_handoff/run.sh - sql/90_try.sql を実行して結果を表示する（エージェントを呼ぶので数分かかる）。
+# 01_router_handoff/run.sh - Run sql/90_try.sql and display results; agent calls take several minutes.
 # Usage: ./run.sh -c <connection>
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

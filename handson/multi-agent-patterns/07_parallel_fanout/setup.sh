@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 07_parallel_fanout/setup.sh - 並列ファンアウト／ファンイン（タスクグラフ）を作成（再実行可能）。00_common が前提。
+# 07_parallel_fanout/setup.sh - Create an idempotent fan-out/fan-in task graph; requires 00_common.
 # Usage: ./setup.sh -c <connection>
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"
@@ -8,7 +8,7 @@ require_common
 if python3 -c "import yaml" 2>/dev/null; then
   python3 "$MAP_ROOT/scripts/build_agents_sql.py" --check >/dev/null || die "sql/10_agents.sql が agents/*.yaml と一致しません: python3 scripts/build_agents_sql.py"
 fi
-deploy_controller        # review.py を含む最新のコントローラを zip に反映
+deploy_controller        # Rebuild the controller ZIP with the latest review.py.
 run_sql "$HERE/sql/10_agents.sql"
 run_sql "$HERE/sql/20_objects.sql"
 run_sql "$HERE/sql/25_tasks.sql"

@@ -1,7 +1,7 @@
 -- 06_skill_composition/sql/02_agents.sql
--- エージェント 6 つ（P0〜P4 と FORMATTER_AGENT）と、P4 が使うプロシージャツール。
--- スキル本文はステージ @<% skill_db %>.LAB.SKILL_STAGE/skills/<name>/SKILL.md（setup.sh がアップロード）。
--- コードワード: P-ALPHA-3141 は親スキル本文だけ、C-BRAVO-2718 はサブスキル（house style）本文だけにある。
+-- Six agents (P0-P4 plus FORMATTER_AGENT) and the procedure tool used by P4.
+-- Skill bodies are at @<% skill_db %>.LAB.SKILL_STAGE/skills/<name>/SKILL.md, uploaded by setup.sh.
+-- Code words: P-ALPHA-3141 appears only in the parent skill body; C-BRAVO-2718 only in the child style skill.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;

@@ -1,5 +1,5 @@
 -- 00_common/sql/99_teardown.sql
--- 共通基盤とパターン 01-04 のオブジェクト（DB 内のすべて）、ウェアハウス、ロールを削除する。
+-- Delete the common foundation, all pattern 01-04 objects in the database, the warehouse, and the role.
 -- Removes ONLY the objects created by multi-agent-patterns. Idempotent.
 -- It does not change account parameters (for example CORTEX_ENABLED_CROSS_REGION).
 

@@ -1,5 +1,5 @@
 -- 00_common/sql/04_semantic_view.sql
--- 共通基盤: Status エージェント（パターン 01）が Cortex Analyst で使うセマンティックビュー。
+-- Common foundation: semantic view used by the pattern 01 Status agent through Cortex Analyst.
 -- One semantic view over PROJECTS and TASKS for Cortex Analyst (read-only status questions).
 
 USE ROLE ACCOUNTADMIN;

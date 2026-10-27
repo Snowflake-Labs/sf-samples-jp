@@ -1,10 +1,10 @@
 -- 07_parallel_fanout/sql/25_tasks.sql
--- タスクグラフ: REVIEW_ROOT → 3 ワーカー（兄弟タスク = 並列実行）、REVIEW_FANIN は finalizer。
--- finalizer はグラフの全タスクが終わった後に、成否にかかわらず必ず実行される。ワーカーが失敗しても
--- fan-in が走り、欠けた観点を partial として記録する（AFTER で 3 ワーカーを待つと、1 つの失敗で fan-in が止まる）。
--- root はスケジュールを持たず SUSPEND のまま。APP.START_PROJECT_REVIEW が EXECUTE TASK ... USING CONFIG で起動する。
--- 子タスク（ワーカーと fan-in）は RESUME しておく必要がある（root はスケジュールが無いため RESUME できない）。
--- タスクは所有者ロール（このファイルを実行したロール）で動く。
+-- Task graph: REVIEW_ROOT -> three concurrent sibling workers; REVIEW_FANIN is the finalizer.
+-- The finalizer runs after the graph regardless of success or failure, so fan-in can record missing perspectives as partial.
+-- An AFTER dependency on all workers would prevent fan-in when any worker fails.
+-- REVIEW_ROOT has no schedule and remains SUSPENDED; APP.START_PROJECT_REVIEW starts it with EXECUTE TASK ... USING CONFIG.
+-- Resume the worker and fan-in child tasks. The unscheduled root cannot be resumed.
+-- Tasks run as their owner role, which is the role that executes this file.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
@@ -46,7 +46,7 @@ CREATE OR REPLACE TASK <% db %>.INTERNAL.REVIEW_FANIN
 AS
     CALL <% db %>.INTERNAL.AGGREGATE_REVIEW(SYSTEM$GET_TASK_GRAPH_CONFIG('run_id')::STRING);
 
--- 子を RESUME（fan-in → ワーカーの順）。root は SUSPEND のまま。
+-- Resume children in fan-in -> worker order; leave the root SUSPENDED.
 ALTER TASK <% db %>.INTERNAL.REVIEW_FANIN RESUME;
 ALTER TASK <% db %>.INTERNAL.REVIEW_SCHEDULE RESUME;
 ALTER TASK <% db %>.INTERNAL.REVIEW_OWNERSHIP RESUME;

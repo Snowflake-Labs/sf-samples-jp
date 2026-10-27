@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_all.sh - 00_common と全パターン（01〜08）を順に作成する（08 は 02 のエージェントを使うので後ろ）。
+# setup_all.sh - Create 00_common and patterns 01-08 in dependency order; 08 reuses agents from 02.
 # Usage: scripts/setup_all.sh -c <connection>
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

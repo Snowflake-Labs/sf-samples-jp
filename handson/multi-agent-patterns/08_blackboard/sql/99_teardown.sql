@@ -1,6 +1,6 @@
 -- 08_blackboard/sql/99_teardown.sql
--- パターン 08 が作ったものだけを削除する。タスクを先に停止・削除してから、ストリーム・ビュー・テーブルを削除する。
--- （掲示板から PROPOSED_ACTIONS に保存された提案は共通基盤のテーブルなので残る）
+-- Delete only pattern 08 objects. Suspend and drop tasks before streams, views, procedures, and tables.
+-- Proposals copied from the board to the common PROPOSED_ACTIONS table remain.
 
 USE ROLE ACCOUNTADMIN;
 

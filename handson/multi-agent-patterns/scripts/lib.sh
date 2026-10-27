@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# lib.sh - 各パターンの setup / teardown が共通で使うシェル関数。
-# 使い方: source "$(dirname "$0")/../scripts/lib.sh"; map_init "$@"
+# lib.sh - Shared shell functions for each pattern's setup and teardown scripts.
+# Usage: source "$(dirname "$0")/../scripts/lib.sh"; map_init "$@"
 #
-# 接続の解決順: -c <name> 引数 -> 環境変数 MAP_CONNECTION -> エラー（暗黙のデフォルト接続は使わない）。
-# オブジェクト名は環境変数で上書きできる（既定値は .env.example を参照）。
+# Connection resolution order: -c <name>, MAP_CONNECTION, then error. Never use an implicit default.
+# Environment variables can override object names; see .env.example for defaults.
 set -euo pipefail
 
 MAP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +12,7 @@ die()  { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 map_init() {
-  # .env はリポジトリに含めない。存在すれば読み込む。
+  # Load .env when present; it must never be committed.
   if [[ -f "$MAP_ROOT/.env" ]]; then set -a; source "$MAP_ROOT/.env"; set +a; fi
   CONFIRM=false
   RUNS="${MAP_RUNS:-3}"
@@ -46,20 +46,20 @@ map_init() {
          MAP_MCP_DATABASE="$MCP_DB" MAP_SKILL_DATABASE="$SKILL_DB"
 }
 
-# 1 クエリを ACCOUNTADMIN で実行し、その結果（最後の結果セット）を JSON で返す。
-# 接続の既定ロールに依存しないよう、毎回 USE ROLE する（既定ロールが別のロールでも誤判定しない）。
+# Run one query as ACCOUNTADMIN and return its last result set as JSON.
+# Always issue USE ROLE so checks do not depend on the connection's default role.
 sqlq() {
   snow sql -c "$CONN" --format json -q "USE ROLE ACCOUNTADMIN; $1" 2>/dev/null \
     | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d[-1] if d and isinstance(d[0], list) else d))"
 }
 
-# ローカルファイルをステージにアップロードする（PUT を ACCOUNTADMIN で実行）
+# Upload a local file to a stage by running PUT as ACCOUNTADMIN.
 put_file() {  # put_file <local file> <@stage/path/>
   snow sql -c "$CONN" -q "USE ROLE ACCOUNTADMIN; PUT 'file://$1' '$2' AUTO_COMPRESS = FALSE OVERWRITE = TRUE" >/dev/null 2>&1
 }
 jfield() { python3 -c "import json,sys; d=json.loads(sys.argv[1]); print($2)" "$1"; }
 
-# SQL ファイルを <% var %> テンプレート変数つきで実行する。失敗時は末尾ログを表示して終了。
+# Run a SQL file with <% var %> template variables; show the log tail and exit on failure.
 run_sql() {
   local file="$1" log
   info "Running ${file#$MAP_ROOT/}"
@@ -71,7 +71,7 @@ run_sql() {
   return 0
 }
 
-# 前提チェック: 接続、ACCOUNTADMIN、クロスリージョン推論。アカウント設定の変更はオプトインのみ。
+# Check the connection, ACCOUNTADMIN, and cross-region inference. Account changes are opt-in only.
 preflight() {
   info "Checking connection"
   snow connection test -c "$CONN" >/dev/null 2>&1 || { sleep 5; snow connection test -c "$CONN" >/dev/null 2>&1; } \
@@ -94,16 +94,16 @@ preflight() {
   fi
 }
 
-# 共通基盤（00_common）がデプロイ済みかを確認する
+# Check whether the 00_common foundation is deployed.
 require_common() {
   local out
-  # 一時的な接続エラーで「未作成」と誤判定しないよう 1 回だけ再試行する
+  # Retry once so a transient connection error is not mistaken for a missing deployment.
   out="$(sqlq "SHOW PROCEDURES LIKE 'BUILD_CONTROLLER_ZIP' IN SCHEMA $DB.AGENTS")" \
     || { sleep 5; out="$(sqlq "SHOW PROCEDURES LIKE 'BUILD_CONTROLLER_ZIP' IN SCHEMA $DB.AGENTS")"; } || out="[]"
   [[ "$(jfield "$out" "len(d)")" != "0" ]] || die "先に 00_common/setup.sh を実行してください（$DB.AGENTS が見つかりません）"
 }
 
-# 指定エージェントが存在するかを確認する
+# Check whether the specified agents exist.
 require_agents() {
   local out name
   out="$(sqlq "SHOW AGENTS IN SCHEMA $DB.AGENTS")" || { sleep 5; out="$(sqlq "SHOW AGENTS IN SCHEMA $DB.AGENTS")"; } || out="[]"
@@ -112,13 +112,13 @@ require_agents() {
   done
 }
 
-# teardown の確認。--confirm が無ければ何もしないで終了。
+# Confirm teardown; exit without changes when --confirm is absent.
 confirm_or_exit() {
   echo "次を削除します:"; printf '  %s\n' "$@"
   $CONFIRM || { echo "何も削除していません。--confirm を付けて再実行してください。"; exit 1; }
 }
 
-# システムロール・既定オブジェクトは削除しない
+# Never delete system roles or default objects.
 guard_names() {
   local x
   for x in "$@"; do
@@ -129,7 +129,7 @@ guard_names() {
   done
 }
 
-# コントローラ（controller/src/*.py）をステージに置き、Snowflake 内で zip を作り直す（00_common / 07 / 08 が使う）
+# Upload controller/src/*.py and rebuild the ZIP in Snowflake for 00_common, 07, and 08.
 deploy_controller() {
   info "Uploading controller/src/*.py to @${DB}.AGENTS.APP_STAGE/lib/src"
   find "$MAP_ROOT/controller" -name "__pycache__" -type d -prune -exec rm -rf {} +

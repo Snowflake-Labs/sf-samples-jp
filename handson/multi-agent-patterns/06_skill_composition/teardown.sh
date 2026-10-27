@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 06_skill_composition/teardown.sh - パターン 06 のデータベースだけを削除（共通ウェアハウスは残す）。
+# 06_skill_composition/teardown.sh - Delete only the pattern 06 database; keep the shared warehouse.
 # Usage: ./teardown.sh -c <connection> --confirm
 source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
 map_init "$@"

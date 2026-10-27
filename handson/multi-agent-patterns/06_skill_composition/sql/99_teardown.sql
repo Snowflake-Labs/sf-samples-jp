@@ -1,4 +1,4 @@
 -- 06_skill_composition/sql/99_teardown.sql
--- パターン 06 のデータベース（ステージとスキルを含む）だけを削除する。
+-- Delete only the pattern 06 database, including its stage and skills.
 USE ROLE ACCOUNTADMIN;
 DROP DATABASE IF EXISTS <% skill_db %>;

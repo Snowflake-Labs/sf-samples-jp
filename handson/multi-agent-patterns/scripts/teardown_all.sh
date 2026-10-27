@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# teardown_all.sh - 本資材が作ったすべてを、パターンごとに依存の逆順で削除する。
-#   08 → 07 → 04 → 03 → 02 → 01（共通 DB 内のタスク・エージェント・プロシージャ）→ 06 → 05（各 DB）
-#   → 00_common（共通 DB、共通ウェアハウス、ロール）
-# 05 / 06 / 00_common は DROP ... IF EXISTS なので毎回実行する。01〜04 は共通 DB が無ければ飛ばす（00_common が DB ごと削除する）。
-# 何度実行してもよい。最後に削除漏れを確認する。
+# teardown_all.sh - Delete everything created by this project in reverse dependency order.
+#   08 -> 07 -> 04 -> 03 -> 02 -> 01 (tasks, agents, and procedures in the common database)
+#   -> 06 -> 05 (dedicated databases) -> 00_common (common database, warehouse, and role)
+# Always run 05, 06, and 00_common because they use DROP ... IF EXISTS. Skip 01-04 if the common database is absent.
+# This script is idempotent and checks for leftovers at the end.
 # Usage: scripts/teardown_all.sh -c <connection> --confirm
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 map_init "$@"
@@ -38,7 +38,7 @@ run_teardown 06_skill_composition
 run_teardown 05_mcp_agent_chaining
 run_teardown 00_common
 
-# 削除漏れの確認
+# Check for objects that were not removed.
 left=""
 for d in "$DB" "$MCP_DB" "$SKILL_DB"; do db_exists "$d" && left="$left DATABASE:$d"; done
 out="$(sqlq "SHOW WAREHOUSES LIKE '$WH'")" && [[ "$(jfield "$out" "len(d)")" != "0" ]] && left="$left WAREHOUSE:$WH"

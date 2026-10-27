@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""パターン 05: M0〜M3 を N 回ずつ実行し、呼び出しが子エージェントに届いたかを判定する。
+"""Run pattern 05 cases M0-M3 N times and detect whether calls reached the child agent.
 
-M-CHILD-5501 は CHILD_AGENT の指示だけ、M-MID-7702 は MIDDLE_AGENT の指示だけにある。
-child_code / middle_code は親の最終回答にコードワードが残ったか、child_reached は応答全体（ツール結果を含む）に
-子のコードワードがあるか（= 子に届いたか）を示す。
+M-CHILD-5501 appears only in CHILD_AGENT instructions, while M-MID-7702 appears only in
+MIDDLE_AGENT instructions. child_code and middle_code report whether the code words remain in the
+parent's final answer. child_reached checks the entire response, including tool results, to verify
+that the request reached the child.
 Usage: python3 run_patterns.py -c <connection> [-n 3]
 """
 import json

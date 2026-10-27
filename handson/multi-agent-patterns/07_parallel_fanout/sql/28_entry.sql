@@ -1,11 +1,11 @@
 -- 07_parallel_fanout/sql/28_entry.sql
--- 実行ロールに公開する入口（所有者権限）。タスクの OPERATE は実行ロールに渡さず、ここだけを通す。
+-- Owner-rights entry points exposed to the execution role. Do not grant OPERATE on tasks; require these procedures.
 
 USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE <% wh %>;
 
 -------------------------------------------------------------------------------
--- 並列: タスクグラフを起動して RUN_ID を返す（非同期）。結果は APP.V_REVIEW_RUNS で確認する。
+-- Parallel entry point: start the task graph asynchronously, return RUN_ID, and inspect APP.V_REVIEW_RUNS.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE <% db %>.APP.START_PROJECT_REVIEW(PROJECT_ID STRING)
 RETURNS VARIANT
@@ -30,7 +30,7 @@ def run(session, project_id):
         return {"ok": False, "error": "PROJECT_ID must look like PRJ-PORTAL"}
     if not session.sql(f"SELECT 1 FROM {DB}.APP.PROJECTS WHERE PROJECT_ID = ?", params=[pid]).collect():
         return {"ok": False, "error": f"project {pid} not found"}
-    # EXECUTE TASK は実行中のグラフに重ねられない。実行中（15 分以内）なら開始しない。
+    # EXECUTE TASK cannot overlap another run of this graph; reject active runs started within 15 minutes.
     busy = session.sql(f"SELECT RUN_ID FROM {DB}.INTERNAL.REVIEW_RUNS WHERE MODE = 'PARALLEL' AND STATUS = 'RUNNING' "
                        f"AND STARTED_AT > DATEADD(minute, -15, CURRENT_TIMESTAMP())").collect()
     if busy:
@@ -38,15 +38,15 @@ def run(session, project_id):
     run_id = "REV-" + uuid.uuid4().hex[:12].upper()
     session.sql(f"INSERT INTO {DB}.INTERNAL.REVIEW_RUNS (RUN_ID, PROJECT_ID, MODE, STATUS) "
                 f"SELECT ?, ?, 'PARALLEL', 'RUNNING'", params=[run_id, pid]).collect()
-    config = json.dumps({"run_id": run_id, "project_id": pid})   # 値は検証済み（英数字と - のみ）
-    dq = "$" * 2   # プロシージャ本文自体がドル引用符で囲まれているため、CONFIG のドル引用符は実行時に組み立てる
+    config = json.dumps({"run_id": run_id, "project_id": pid})   # Values are validated: alphanumeric characters and hyphens only.
+    dq = "$" * 2   # Build CONFIG dollar quotes at runtime because dollar quotes delimit this procedure body.
     session.sql(f"EXECUTE TASK {DB}.INTERNAL.REVIEW_ROOT USING CONFIG = {dq}{config}{dq}").collect()
     return {"ok": True, "run_id": run_id, "project_id": pid,
             "message": "started; SELECT * FROM APP.V_REVIEW_RUNS WHERE RUN_ID = '" + run_id + "'"}
 $$;
 
 -------------------------------------------------------------------------------
--- 逐次ベースライン: 同じワーカーを 1 つずつ呼び、同じ fan-in を行う（同期）。並列との比較用。
+-- Sequential baseline: call the same workers one by one, then run the same fan-in synchronously.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE <% db %>.APP.RUN_PROJECT_REVIEW_SEQUENTIAL(PROJECT_ID STRING)
 RETURNS VARIANT

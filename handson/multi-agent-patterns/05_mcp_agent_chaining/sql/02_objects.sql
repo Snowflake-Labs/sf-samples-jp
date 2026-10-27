@@ -1,7 +1,7 @@
 -- 05_mcp_agent_chaining/sql/02_objects.sql
--- エージェント 5 つ、MCP サーバー 2 つ、ベースライン用のプロシージャツール 1 つ。
--- コードワード: M-CHILD-5501 は CHILD_AGENT の指示だけ、M-MID-7702 は MIDDLE_AGENT の指示だけに書かれている。
--- 親の回答にコードワードがあれば、その呼び出しが本当にそのエージェントに届いた証拠になる。
+-- Five agents, two MCP servers, and one procedure tool for the baseline.
+-- Code words: M-CHILD-5501 appears only in CHILD_AGENT instructions; M-MID-7702 only in MIDDLE_AGENT instructions.
+-- A code word in the parent answer proves that the call reached the corresponding agent.
 --
 -- Agents, MCP servers, and one procedure tool for the baseline.
 -- Code words: M-CHILD-5501 lives only in CHILD_AGENT's instructions, M-MID-7702 only in MIDDLE_AGENT's.

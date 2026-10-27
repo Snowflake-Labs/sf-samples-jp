@@ -1,6 +1,6 @@
 -- 00_common/sql/05_tools.sql
--- 共通基盤: エージェント用の読み取り専用ツールと、コントローラ専用の書き込みプロシージャ（所有者権限）。
--- ASK_*_WORKER（エージェントからエージェントを呼ぶラッパー）はパターン 03 で作成する。
+-- Common foundation: read-only agent tools and owner-rights write procedures for controllers.
+-- Pattern 03 creates the ASK_*_WORKER wrappers that invoke agents from another agent.
 -- Custom tools for Cortex Agents and controller-only write-path procedures.
 --
 -- Agent-callable (read-only):   GET_TASK, SEARCH_SIMILAR_TASKS, GET_PROJECT_POLICY,
