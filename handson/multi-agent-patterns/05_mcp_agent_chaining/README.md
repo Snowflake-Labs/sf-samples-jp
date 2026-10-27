@@ -106,6 +106,50 @@ mcp_servers:
 
 M1 の 1 回は、子の整形結果は届いていましたが、親が最終回答からコードワードを落としていました。届いた内容をどう使うかは親の LLM 次第です。
 
+### Snowsight で試す
+
+スクリプトで構築したエージェントには、Snowsight からも直接リクエストできます。このパターンは **`ACCOUNTADMIN`** で作成・実行する前提です。
+ユーザーに既定ウェアハウスが設定されている必要があります（[前提条件](../README.md#前提条件)）。オブジェクト名を変えた場合は、以下の名前を読み替えてください。
+
+#### エージェントのプレイグラウンド（Preview）で試す
+
+1. Snowsight にサインインし、左下のユーザーメニューで上記のロールに切り替えます。
+2. ナビゲーションメニューで **AI & ML » Agents** を選びます。
+3. 一覧から下表のエージェントを選び、エージェントの詳細ページにあるプレイグラウンドにメッセージを入力します。
+
+| エージェント | 入力例 | 期待される応答 |
+|----|----|----|
+| `CHILD_AGENT` | `Format this draft: The Q3 data migration moved 12 tables. Validation is next. The legacy job may run late.` | `## Status report` と `Done:` / `Next:` / `Risk:`、最後に `M-CHILD-5501` |
+| `M1_PARENT_MCP_AGENT` | `Write a status report about the Q3 data migration project.` | MCP ツール `child_mcp_format_status_report` を呼び、整形済みの報告（`M-CHILD-5501` 付き） |
+| `M2_PARENT_TWO_HOP_AGENT` | （M1 と同じ） | `middle_mcp_review_status_report` を呼び、`M-MID-7702` と `M-CHILD-5501` の両方を含む報告 |
+| `M3_PARENT_PROCEDURE_AGENT` | （M1 と同じ） | プロシージャツール `format_status_report` 経由で同じ報告 |
+
+> プレイグラウンドでは、親エージェントが呼んだ MCP ツールとその結果を応答の中で確認できます。M1 / M2 のツール結果には子（と中間）エージェントの応答全体が入るため、M3 より長くなります。
+
+#### Workspaces の SQL ファイルで試す
+
+1. ナビゲーションメニューで **Projects » Workspaces** を選び、**My Workspace** で **+ Add New » SQL File** を選んで SQL ファイルを作ります。
+2. 次の SQL を貼り付け、文を選択して `Cmd + Return`（Windows は `Ctrl + Enter`）で実行します。
+
+**エージェントを直接呼ぶ（`DATA_AGENT_RUN`）**
+
+`SNOWFLAKE.CORTEX.DATA_AGENT_RUN` の応答（JSON）を展開し、ツール呼び出しと最終テキストを 1 行ずつ表示します。
+
+```sql
+USE ROLE ACCOUNTADMIN;
+USE WAREHOUSE MULTI_AGENT_PATTERNS_WH;
+
+SELECT c.value:type::STRING AS TYPE, c.value:tool_use:name::STRING AS TOOL, c.value:text::STRING AS TEXT
+FROM (SELECT TRY_PARSE_JSON(SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
+        'MAP_MCP_CHAIN.LAB.M1_PARENT_MCP_AGENT',
+        $${"messages": [{"role": "user", "content": [{"type": "text", "text": "Write a status report about the Q3 data migration project."}]}]}$$
+      )) AS R) r,
+     LATERAL FLATTEN(r.R:content) c
+WHERE c.value:type::STRING IN ('tool_use', 'text');
+```
+
+`TOOL` 列に `child_mcp_format_status_report` が出れば、MCP サーバー経由で子エージェントが呼ばれています。M2 は `M2_PARENT_TWO_HOP_AGENT`、ベースラインは `M3_PARENT_PROCEDURE_AGENT` に置き換えて比較してください。
+
 ## 6. 設計上のポイントとトレードオフ
 
 - **MCP ツールの結果は子の応答全体**: 子の思考ブロック、ツール呼び出し、テキストが JSON 文字列として親に返ります。2 hop では、中間の応答の中に子の応答がまるごと入れ子になります。そのため、**hop ごとにペイロードが増えます**（M0 約 2 KB → M1 約 11 KB → M2 約 26 KB）。

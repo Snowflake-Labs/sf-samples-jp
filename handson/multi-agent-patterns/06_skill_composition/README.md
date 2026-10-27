@@ -80,6 +80,51 @@ skills:
 
 P2 の結果は、公式ドキュメントの制約（スキルフォルダのサブディレクトリは探索されない）と一致します（[Agent skills の Limitations](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-skills)）。
 
+### Snowsight で試す
+
+スクリプトで構築したエージェントには、Snowsight からも直接リクエストできます。このパターンは **`ACCOUNTADMIN`** で作成・実行する前提です。
+ユーザーに既定ウェアハウスが設定されている必要があります（[前提条件](../README.md#前提条件)）。オブジェクト名を変えた場合は、以下の名前を読み替えてください。
+
+#### エージェントのプレイグラウンド（Preview）で試す
+
+1. Snowsight にサインインし、左下のユーザーメニューで上記のロールに切り替えます。
+2. ナビゲーションメニューで **AI & ML » Agents** を選びます。
+3. 一覧から下表のエージェントを選び、エージェントの詳細ページにあるプレイグラウンドにメッセージを入力します。
+
+| エージェント | 入力例 | 期待される応答 |
+|----|----|----|
+| `P0_CONTROL_AGENT` | `Format this draft status report: The Q3 data migration moved 12 tables. Validation is next. The legacy job may run late.` | `## Status report` 形式で、`C-BRAVO-2718` 付き |
+| `P1_PEER_AGENT` | `Write a status report about the Q3 data migration project.` | `P-ALPHA-3141` と `C-BRAVO-2718` の両方（スキルが 2 回読まれる） |
+| `P2_NESTED_AGENT` | （P1 と同じ） | `P-ALPHA-3141` だけ。`child/SKILL.md` は読まれず、書式も適用されない |
+| `P3_COMBINED_AGENT` | （P1 と同じ） | `P-ALPHA-3141` と `C-BRAVO-2718` の両方 |
+| `P4_SUBAGENT_AGENT` | （P1 と同じ） | ツール `ask_formatter_agent` を呼び、`P-ALPHA-3141` と `C-BRAVO-2718` の両方 |
+
+> プレイグラウンドでは、どのスキルが読み込まれたか（スキルの呼び出し）を応答の中で確認できます。
+
+#### Workspaces の SQL ファイルで試す
+
+1. ナビゲーションメニューで **Projects » Workspaces** を選び、**My Workspace** で **+ Add New » SQL File** を選んで SQL ファイルを作ります。
+2. 次の SQL を貼り付け、文を選択して `Cmd + Return`（Windows は `Ctrl + Enter`）で実行します。
+
+**エージェントを直接呼ぶ（`DATA_AGENT_RUN`）**
+
+`SNOWFLAKE.CORTEX.DATA_AGENT_RUN` の応答（JSON）を展開し、ツール呼び出しと最終テキストを 1 行ずつ表示します。
+
+```sql
+USE ROLE ACCOUNTADMIN;
+USE WAREHOUSE MULTI_AGENT_PATTERNS_WH;
+
+SELECT c.value:type::STRING AS TYPE, c.value:tool_use:name::STRING AS TOOL, c.value:text::STRING AS TEXT
+FROM (SELECT TRY_PARSE_JSON(SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
+        'MAP_SKILL_COMPOSITION.LAB.P1_PEER_AGENT',
+        $${"messages": [{"role": "user", "content": [{"type": "text", "text": "Write a status report about the Q3 data migration project."}]}]}$$
+      )) AS R) r,
+     LATERAL FLATTEN(r.R:content) c
+WHERE c.value:type::STRING IN ('tool_use', 'text');
+```
+
+`TOOL` 列に `server_skill` が 2 回（親スキルとサブスキル）出れば、ピア登録したサブスキルが使われています。`P2_NESTED_AGENT` に置き換えると、サブスキルが読まれないことを確認できます。
+
 ## 6. 設計上のポイントとトレードオフ
 
 | 方式 | 長所 | 短所 |

@@ -88,14 +88,16 @@ preflight() {
 # 共通基盤（00_common）がデプロイ済みかを確認する
 require_common() {
   local out
-  out="$(sqlq "SHOW PROCEDURES LIKE 'BUILD_CONTROLLER_ZIP' IN SCHEMA $DB.AGENTS")" || out="[]"
+  # 一時的な接続エラーで「未作成」と誤判定しないよう 1 回だけ再試行する
+  out="$(sqlq "SHOW PROCEDURES LIKE 'BUILD_CONTROLLER_ZIP' IN SCHEMA $DB.AGENTS")" \
+    || { sleep 5; out="$(sqlq "SHOW PROCEDURES LIKE 'BUILD_CONTROLLER_ZIP' IN SCHEMA $DB.AGENTS")"; } || out="[]"
   [[ "$(jfield "$out" "len(d)")" != "0" ]] || die "先に 00_common/setup.sh を実行してください（$DB.AGENTS が見つかりません）"
 }
 
 # 指定エージェントが存在するかを確認する
 require_agents() {
   local out name
-  out="$(sqlq "SHOW AGENTS IN SCHEMA $DB.AGENTS")" || out="[]"
+  out="$(sqlq "SHOW AGENTS IN SCHEMA $DB.AGENTS")" || { sleep 5; out="$(sqlq "SHOW AGENTS IN SCHEMA $DB.AGENTS")"; } || out="[]"
   for name in "$@"; do
     jfield "$out" "'$name' in [r['name'] for r in d]" | grep -q True || die "$name がありません。依存するパターンを先に setup してください"
   done

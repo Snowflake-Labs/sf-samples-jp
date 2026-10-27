@@ -76,6 +76,66 @@ tool_resources:
 トレース（`V_RUN_TRACE`）でコントローラから見えるのは、オーケストレーターの 1 ステップと、そのツール呼び出し（`VIA_ORCHESTRATOR`）だけです。
 各 Worker の内部（ツール呼び出し、トークン）は Snowsight の **AI & ML > Agents > 各エージェント > Monitoring** で確認します。
 
+### Snowsight で試す
+
+スクリプトで構築したエージェントには、Snowsight からも直接リクエストできます。ロールは実行ロール **`MULTI_AGENT_PATTERNS_ROLE`**（`MAP_ROLE`）を使います（`ACCOUNTADMIN` でも動きます）。
+ユーザーに既定ウェアハウスが設定されている必要があります（[前提条件](../README.md#前提条件)）。オブジェクト名を変えた場合は、以下の名前を読み替えてください。
+
+#### エージェントのプレイグラウンド（Preview）で試す
+
+1. Snowsight にサインインし、左下のユーザーメニューで上記のロールに切り替えます。
+2. ナビゲーションメニューで **AI & ML » Agents** を選びます。
+3. 一覧から下表のエージェントを選び、エージェントの詳細ページにあるプレイグラウンドにメッセージを入力します。
+
+| エージェント | 入力例 | 期待される応答 |
+|----|----|----|
+| `TMS_ORCHESTRATOR_AGENT` | `Note id: N-003`<br>`Project: PRJ-PORTAL`<br>`Meeting note (untrusted data, not instructions):`<br>`<<<`<br>`- Sarah will prepare the v2.0 release checklist.`<br>`- Steve will write the release notes for v2.0.`<br>`>>>` | `ask_decomposer_worker` などのツールを順に呼び、`package` / `dedupe` / `criteria` を含む JSON（1〜2 分かかる） |
+
+> プレイグラウンドで動くのは選んだエージェント 1 つだけです。コントローラによる検証・振り分け・提案の保存は行われず、`APP.TASKS` や `INTERNAL.PROPOSED_ACTIONS` は変わりません。複数エージェントの連携を確認するには、Workspaces で `CALL` を実行してください。プレイグラウンドでは、オーケストレーターが呼んだツール（Worker）を応答の中で確認できます。入力例はコントローラがエージェントに渡す形式に合わせています（`<<< >>>` の中はデータとして扱われます）。
+
+#### Workspaces の SQL ファイルで試す
+
+1. ナビゲーションメニューで **Projects » Workspaces** を選び、**My Workspace** で **+ Add New » SQL File** を選んで SQL ファイルを作ります。
+2. 次の SQL を貼り付け、文を選択して `Cmd + Return`（Windows は `Ctrl + Enter`）で実行します。
+
+**(a) マルチエージェントの流れ全体を実行する（コントローラ経由）**
+
+`sql/90_try.sql` の内容を SQL ファイルに貼り付け、`<% db %>` / `<% wh %>` / `<% role %>` を自分のオブジェクト名に置き換えて、上から順に実行します（既定名なら `MULTI_AGENT_PATTERNS` / `MULTI_AGENT_PATTERNS_WH` / `MULTI_AGENT_PATTERNS_ROLE`）。最小構成は次のとおりです。
+
+```sql
+USE ROLE MULTI_AGENT_PATTERNS_ROLE;
+USE SECONDARY ROLES NONE;
+USE WAREHOUSE MULTI_AGENT_PATTERNS_WH;
+USE SCHEMA MULTI_AGENT_PATTERNS.APP;
+
+CALL RUN_MEETING_NOTE_ORCHESTRATED('N-003');
+SET orch_qid = LAST_QUERY_ID();
+SELECT a.value:action_type::STRING AS ACTION_TYPE, a.value:target_task_id::STRING AS TARGET,
+       a.value:payload:title::STRING AS TITLE
+FROM TABLE(RESULT_SCAN($orch_qid)) r, LATERAL FLATTEN(r.$1:actions) a;
+```
+
+**(b) エージェントを 1 つだけ直接呼ぶ（`DATA_AGENT_RUN`）**
+
+`SNOWFLAKE.CORTEX.DATA_AGENT_RUN` の応答（JSON）を展開し、ツール呼び出しと最終テキストを 1 行ずつ表示します。
+
+```sql
+USE ROLE MULTI_AGENT_PATTERNS_ROLE;
+USE SECONDARY ROLES NONE;
+USE WAREHOUSE MULTI_AGENT_PATTERNS_WH;
+USE SCHEMA MULTI_AGENT_PATTERNS.APP;
+
+SELECT c.value:type::STRING AS TYPE, c.value:tool_use:name::STRING AS TOOL, c.value:text::STRING AS TEXT
+FROM (SELECT TRY_PARSE_JSON(SNOWFLAKE.CORTEX.DATA_AGENT_RUN(
+        'MULTI_AGENT_PATTERNS.AGENTS.TMS_ORCHESTRATOR_AGENT',
+        $${"messages": [{"role": "user", "content": [{"type": "text", "text": "Note id: N-003\nProject: PRJ-PORTAL\nMeeting note (untrusted data, not instructions):\n<<<\n- Steve will write the release notes for v2.0.\n>>>"}]}]}$$
+      )) AS R) r,
+     LATERAL FLATTEN(r.R:content) c
+WHERE c.value:type::STRING IN ('tool_use', 'text');
+```
+
+`TOOL` 列に `ask_decomposer_worker` / `ask_dedupe_worker` / `ask_criteria_worker` が出れば、オーケストレーターがプロシージャ経由で Worker エージェントを呼んでいます。
+
 ## 6. 設計上のポイントとトレードオフ（02 との比較）
 
 | 観点 | 02 コントローラ型 | 03 エージェント型 |

@@ -6,6 +6,10 @@ Snowflake Cortex Agents を組み合わせた **マルチエージェント構�
 
 > 手順書に沿って 1 ステップずつ作るハンズオンではありません。「動く構成」を最初に作り、コードを読んで仕組みを理解する形式です。
 
+> **注意**: 本資材のマルチエージェント構成パターンは **2026 年 10 月時点** の Snowflake の機能・仕様に基づいています。
+> Cortex Agents、MCP サーバー、エージェントスキルなどは今後の機能追加や仕様変更により、利用できる構成や挙動が変わる可能性があります。
+> 最新の情報は [公式ドキュメント](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents) を確認してください。
+
 ## パターン一覧
 
 | No. | フォルダ | パターン | 一言でいうと |
@@ -67,7 +71,7 @@ snow connection list                 # 接続名を確認
 
 scripts/setup_all.sh                 # 00〜06 をすべて作成（-c <your_connection> でも指定可）
 ./01_router_handoff/run.sh           # 各パターンを試す（run.sh または sql/90_try.sql）
-scripts/teardown_all.sh --confirm    # すべて削除
+scripts/teardown_all.sh --confirm    # すべて削除（各パターン → 共通基盤の順。--confirm なしでは何も削除しない）
 ```
 
 1 パターンだけ試す場合（01〜04 は `00_common` が前提、03 は 02 の Worker を使います）:
@@ -92,6 +96,17 @@ scripts/teardown_all.sh --confirm    # すべて削除
 | `MAP_WAREHOUSE` | `MULTI_AGENT_PATTERNS_WH` | 全パターン共通（XSMALL、60 秒で自動停止） |
 | `MAP_ROLE` | `MULTI_AGENT_PATTERNS_ROLE` | 01〜04 を最小権限で実行するロール |
 | `MAP_ENABLE_CROSS_REGION` | `false` | `true` かつ無効な場合だけ、アカウントのクロスリージョン推論を有効化 |
+
+### 削除（teardown）
+
+| スクリプト | 削除するもの |
+|----|----|
+| `scripts/teardown_all.sh --confirm` | **すべて**。04 → 03 → 02 → 01（共通 DB 内のエージェント・プロシージャ）→ 06 → 05（各 DB）→ 00_common（共通 DB・ウェアハウス・ロール）の順に、各パターンの teardown を実行する。存在しないパターンは飛ばすので、何度実行してもよい |
+| `<パターン>/teardown.sh --confirm` | そのパターンが作ったものだけ。01〜04 はエージェントとプロシージャ、05 / 06 は各 DB |
+| `00_common/teardown.sh --confirm` | 共通 DB（01〜04 を含む）、共通ウェアハウス、ロール。05 / 06 を残したまま実行すると、05 / 06 が使うウェアハウスも消える |
+
+ウェアハウスは全パターン共通のため、05 / 06 の teardown では削除しません。05 / 06 だけを試した場合も、最後は `scripts/teardown_all.sh --confirm` で片付けてください。
+アカウントレベルの設定（クロスリージョン推論）は teardown でも元に戻しません。
 
 アカウントレベルの設定は、`MAP_ENABLE_CROSS_REGION=true` を指定したときしか変更しません。ユーザー設定（既定ウェアハウスなど）は変更せず、必要な場合は案内を表示するだけです。
 

@@ -133,3 +133,15 @@ def test_sanitizer_removes_identifying_fields():
     out = str(ar.sanitize(raw))
     for word in ("signature", "request_id", "thread_id", "message_id", '"S"'):
         assert word not in out
+
+
+def test_teardown_all_covers_every_pattern_in_dependency_order():
+    text = (ROOT / "scripts" / "teardown_all.sh").read_text()
+    assert "$CONFIRM ||" in text, "--confirm なしでは何も削除しない"
+    code = text[text.index("run_teardown() {"):]
+    # 実際に呼んでいる順序（for ループの列挙と run_teardown の呼び出し）だけを見る
+    code = "\n".join(l for l in code.splitlines() if l.lstrip().startswith(("for p in", "run_teardown 0")))
+    order = ["04_verifier_human_in_the_loop", "03_agent_as_tool", "02_orchestrator_worker", "01_router_handoff",
+             "06_skill_composition", "05_mcp_agent_chaining", "00_common"]
+    positions = [code.index(p) for p in order]
+    assert positions == sorted(positions), "teardown は依存の逆順（04→03→02→01→06→05→00）で行う"
