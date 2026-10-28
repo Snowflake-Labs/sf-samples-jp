@@ -8,3 +8,4 @@ results/
 __pycache__/
 .pytest_cache/
 *.zip
+blog/
