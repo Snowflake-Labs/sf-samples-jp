@@ -147,4 +147,3 @@ tool_resources:
       warehouse: <% wh %>
       query_timeout: 60
 $$;
-

@@ -46,7 +46,7 @@ def render(pattern: str, names: list[str]) -> str:
             "$$;",
             "",
         ]
-    return "\n".join(out) + "\n"
+    return "\n".join(out).rstrip() + "\n"
 
 
 def main() -> int:

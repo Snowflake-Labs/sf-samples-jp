@@ -1,6 +1,7 @@
 """Offline tests for repository structure, naming, and publication safety. Run: pytest tests -q"""
 import ast
 import io
+import json
 import pathlib
 import re
 import subprocess
@@ -19,11 +20,27 @@ TEXT_FILES = [p for p in ROOT.rglob("*") if p.is_file() and p.suffix in {".sql",
 SQL_FILES = sorted(ROOT.glob("0*/sql/*.sql"))
 KNOWN_VARS = {"db", "wh", "role", "mcp_db", "skill_db", "wh_size", "wh_suspend"}
 JAPANESE_TEXT = re.compile(r"[ぁ-んァ-ヶ一-龯々ー]")
+CONTRACT_SCHEMAS = {
+    "candidate-package.schema.json", "proposed-action.schema.json",
+    "route-result.schema.json", "verification-result.schema.json",
+}
 
 
 def test_generated_agent_sql_is_current():
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_agents_sql.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+def test_required_contract_schemas_are_present_and_publishable():
+    schema_dir = ROOT / "controller" / "schemas"
+    assert {path.name for path in schema_dir.glob("*.schema.json")} == CONTRACT_SCHEMAS
+    for name in CONTRACT_SCHEMAS:
+        schema = json.loads((schema_dir / name).read_text())
+        assert schema.get("$schema") == "https://json-schema.org/draft/2020-12/schema"
+        assert schema.get("type") == "object"
+    for name in CONTRACT_SCHEMAS:
+        ignored = subprocess.run(["git", "check-ignore", "-q", str(schema_dir / name)], cwd=ROOT)
+        assert ignored.returncode == 1, f"contract schema must not be ignored by Git: {name}"
 
 
 @pytest.mark.parametrize("pattern", PATTERNS)

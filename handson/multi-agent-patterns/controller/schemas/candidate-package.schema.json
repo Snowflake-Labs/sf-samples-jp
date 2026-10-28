@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CandidatePackage",
+  "description": "Output of TMS_DECOMPOSER_AGENT: explicit commitments from one meeting note.",
+  "type": "object",
+  "required": [
+    "note_id",
+    "project_id",
+    "candidates",
+    "ignored"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "note_id": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "title",
+          "quote"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignee": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "due_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "ignored": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "quote",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "quote": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "not_a_commitment",
+              "no_owner",
+              "undecided",
+              "status_update",
+              "instruction_in_data"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

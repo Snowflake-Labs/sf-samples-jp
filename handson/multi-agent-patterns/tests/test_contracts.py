@@ -171,7 +171,7 @@ def test_generated_agent_sql_is_current():
     assert result.returncode == 0, result.stdout
 
 
-# ------------------------------------------------------------------ headless controller 
+# ------------------------------------------------------------------ headless controller
 @pytest.mark.parametrize("path", sorted((ROOT / "controller" / "src").glob("*.py")), ids=lambda p: p.name)
 def test_controller_modules_do_not_import_streamlit(path):
     assert not re.search(r"^\s*(import|from)\s+streamlit\b", path.read_text(), re.M), \

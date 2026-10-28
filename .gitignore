@@ -70,6 +70,7 @@ config.toml
 *.avro
 *.orc
 *.json
+!handson/multi-agent-patterns/controller/schemas/*.schema.json
 *.jsonl
 *.ndjson
 
