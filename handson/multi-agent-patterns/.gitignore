@@ -1,0 +1,11 @@
+# 開発用ドキュメント（公開しない）
+TASK.md
+AGENTS.md
+
+# ローカル設定・実行結果
+.env
+results/
+__pycache__/
+.pytest_cache/
+*.zip
+blog/

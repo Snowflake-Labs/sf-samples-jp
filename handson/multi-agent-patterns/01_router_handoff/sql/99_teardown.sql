@@ -1,0 +1,10 @@
+-- 01_router_handoff/sql/99_teardown.sql
+-- Delete only this pattern's agents and procedure; keep the common foundation.
+
+USE ROLE ACCOUNTADMIN;
+
+DROP AGENT IF EXISTS <% db %>.AGENTS.TMS_ROUTER_AGENT;
+DROP AGENT IF EXISTS <% db %>.AGENTS.TMS_INTAKE_AGENT;
+DROP AGENT IF EXISTS <% db %>.AGENTS.TMS_STATUS_AGENT;
+DROP AGENT IF EXISTS <% db %>.AGENTS.TMS_CHANGE_AGENT;
+DROP PROCEDURE IF EXISTS <% db %>.APP.RUN_INBOX_REQUEST(STRING, STRING);

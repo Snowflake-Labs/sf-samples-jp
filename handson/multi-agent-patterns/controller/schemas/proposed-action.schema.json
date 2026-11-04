@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProposedAction",
+  "description": "A write proposal from an agent. Nothing is written until verification and human approval.",
+  "type": "object",
+  "required": [
+    "action_type",
+    "payload",
+    "reason",
+    "evidence",
+    "confidence",
+    "risk_level"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "type": "string"
+    },
+    "action_type": {
+      "enum": [
+        "CREATE_TASK",
+        "UPDATE_TASK",
+        "LINK_DUPLICATE",
+        "SKIP"
+      ]
+    },
+    "target_task_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^T-[0-9]+$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "IN_PROGRESS",
+            "BLOCKED",
+            "DONE"
+          ]
+        },
+        "priority": {
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "due_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "acceptance_criteria": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source_type",
+          "source_id",
+          "quote"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_type": {
+            "enum": [
+              "REQUEST",
+              "MEETING_NOTE"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "risk_level": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "CREATE_TASK"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "project_id",
+              "title",
+              "priority"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "enum": [
+              "UPDATE_TASK",
+              "LINK_DUPLICATE"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_task_id"
+        ],
+        "properties": {
+          "target_task_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

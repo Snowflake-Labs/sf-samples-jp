@@ -1,0 +1,12 @@
+-- 07_parallel_fanout/sql/30_grants.sql
+-- Grant only entry procedures and inspection views; tasks, workers, and aggregation remain owner-only.
+
+USE ROLE ACCOUNTADMIN;
+
+GRANT USAGE ON PROCEDURE <% db %>.APP.START_PROJECT_REVIEW(STRING) TO ROLE <% role %>;
+GRANT USAGE ON PROCEDURE <% db %>.APP.RUN_PROJECT_REVIEW_SEQUENTIAL(STRING) TO ROLE <% role %>;
+GRANT SELECT ON VIEW <% db %>.APP.V_REVIEW_RUNS TO ROLE <% role %>;
+GRANT SELECT ON VIEW <% db %>.APP.V_REVIEW_WORKERS TO ROLE <% role %>;
+GRANT USAGE ON AGENT <% db %>.AGENTS.TMS_SCHEDULE_REVIEWER_AGENT TO ROLE <% role %>;
+GRANT USAGE ON AGENT <% db %>.AGENTS.TMS_OWNERSHIP_REVIEWER_AGENT TO ROLE <% role %>;
+GRANT USAGE ON AGENT <% db %>.AGENTS.TMS_QUALITY_REVIEWER_AGENT TO ROLE <% role %>;

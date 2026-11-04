@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# 06_skill_composition/setup.sh - Create an idempotent standalone skill/subskill setup.
+# Usage: ./setup.sh -c <connection>
+source "$(cd "$(dirname "$0")" && pwd)/../scripts/lib.sh"
+map_init "$@"
+HERE="$MAP_ROOT/06_skill_composition"
+preflight
+run_sql "$HERE/sql/01_namespace.sql"
+info "Uploading skills to @$SKILL_DB.LAB.SKILL_STAGE/skills/"
+while IFS= read -r f; do
+  rel="${f#$HERE/skills/}"; dir="$(dirname "$rel")"
+  put_file "$f" "@${SKILL_DB}.LAB.SKILL_STAGE/skills/${dir}/" || die "upload of $rel failed"
+done < <(find "$HERE/skills" -name SKILL.md | sort)
+sqlq "ALTER STAGE $SKILL_DB.LAB.SKILL_STAGE REFRESH" >/dev/null
+run_sql "$HERE/sql/02_agents.sql"
+echo "Setup complete: $SKILL_DB.LAB. Next: ./run.sh -c $CONN"

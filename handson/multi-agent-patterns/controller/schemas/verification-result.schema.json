@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationResult",
+  "description": "Output of TMS_VERIFIER_AGENT.",
+  "type": "object",
+  "required": [
+    "verdict",
+    "issues",
+    "checked"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "enum": [
+        "PASS",
+        "NEEDS_HUMAN",
+        "FAIL"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "checked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
