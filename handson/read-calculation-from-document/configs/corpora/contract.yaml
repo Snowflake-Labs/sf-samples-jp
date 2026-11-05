@@ -1,0 +1,40 @@
+# 契約書コーパスの設定
+name: contract
+title: 日本語ビジネス契約書（合成）
+source:
+  kind: huggingface                 # huggingface（既定）| local（開発用）
+  huggingface:
+    repo_id: cvusk/japanese-contract-document-understanding-calculation
+    revision: 6630dbb56387fb502df8386238eb2c09ed17002a   # 40 桁のコミット SHA。main・タグ・短縮 SHA は不可
+  local:
+    path: ${DATA_ROOT_CONTRACT}     # kind: local のときだけ。configs/deploy.local.env から展開する
+license:
+  dataset: CC-BY-4.0
+  attribution: Yusuke Shibui (shibuiwilliam)
+  notices: [NOTICE.md]              # フォント：Noto Sans/Serif JP（SIL OFL 1.1）
+index:
+  # 完全な索引は正解由来の列（n_rules・patterns・challenge_* など）を含む。fetch がメモリ上で読み、下の列だけを
+  # data/<corpus>/<rev>/public_index.jsonl に写す。完全な索引はディスク・ステージ・イメージに置かない
+  file: data/documents.jsonl
+  records: null                     # JSON Lines の 1 行 1 文書
+  columns: {doc_id: content_id, split_group: base_content_id, stratum: doctype, styles: style_id, pages: pages, pdf_file: pdf_file}
+  sha256_from: hub_paths_info       # Hub の paths-info API の LFS SHA-256
+paths:
+  # 予測用（予測ジョブが読むのはこれだけ）
+  pdf: "inputs/{doc_id}/{doc_id}--{style}.pdf"
+  pdf_id: "{doc_id}--{style}"
+  # 評価用（評価ロールだけ。--eval のときだけ取得する）
+  gold:
+    - "answers/{doc_id}/**"
+    - "inputs/{doc_id}/calendar.json"
+    - "inputs/{doc_id}/tasks.jsonl"
+    - "inputs/{doc_id}/contract.json"
+    - "inputs/{doc_id}/layout.json"   # 読み取りの採点
+  gold_root: "answers/{doc_id}"
+  gold_tests: "answers/{doc_id}/tests"
+split:
+  salt: "jpcalc-contract-split-v1:"
+  dev_fraction: 0.4                 # 層ごとに round(base 数 × 0.4) を DEV にする（Python の round）
+harness:
+  date_args: TYPES                  # 日付の変換はテストファイルの _TYPES
+  calendar: true                    # uses_calendar の関数に holidays（frozenset[date]）を渡す

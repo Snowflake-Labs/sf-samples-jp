@@ -1,0 +1,46 @@
+# 予測ジョブ（S10）の仕様のひな型。<schema_ops>.S10_PREDICT が EXECUTE JOB SERVICE … USING (…) で値を埋める。
+# USING の値は JSON のリテラルとして差し込まれるので、YAML のスカラー全体を 1 つの変数にする（部分置換しない）。
+# マウントするのは予測の入力（PDF・照合値・手本）と生成物のステージだけ。正解のステージはマウントしない。
+# コマンドをシェルで包まない（失敗を握りつぶさない）。外部アクセス統合を付けない。
+spec:
+  containers:
+  - name: main
+    image: {{ image }}
+    command:
+    - python
+    - -m
+    - jpcalc
+    - job
+    - predict
+    - --run-id
+    - {{ run_id }}
+    env:
+      JPCALC_IMAGE_TAG: {{ image_tag }}
+      JPCALC_STAGE_PDFS: /stage/pdfs
+      JPCALC_STAGE_RESULTS: /stage/results
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 1
+        memory: 4Gi
+    volumeMounts:
+    - name: pdfs
+      mountPath: /stage/pdfs
+    - name: results
+      mountPath: /stage/results
+  volumes:
+  # ステージのボリュームへの書き込みには uid / gid の指定が要る（コンテナは uid 1000 で動く）
+  - name: pdfs
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_pdfs }}
+  - name: results
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_results }}

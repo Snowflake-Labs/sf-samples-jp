@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "card.schema.json",
+  "title": "合成カード（段 K が PDF から作る、実装する関数の宣言）",
+  "description": "予測の出力 cards.jsonl の 1 行。採点側の対応付けがこの形を読む。単位の語彙は configs/conventions.yaml の units を正本とし、K の決定的な検査で照合する。",
+  "type": "object",
+  "required": [
+    "task_id",
+    "content_id",
+    "function",
+    "title",
+    "kind",
+    "hint",
+    "inputs",
+    "output",
+    "conventions",
+    "evidence_units"
+  ],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 3},
+    "content_id": {"type": "string", "minLength": 1},
+    "function": {"$ref": "#/$defs/name"},
+    "title": {"type": "string"},
+    "kind": {"enum": ["calculation", "decision"]},
+    "hint": {"const": "auto"},
+    "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/input"}},
+    "output": {
+      "type": "object",
+      "required": ["type", "unit", "nullable"],
+      "properties": {
+        "type": {"enum": ["int", "bool", "date"]},
+        "unit": {"type": ["string", "null"]},
+        "nullable": {"type": "boolean"}
+      }
+    },
+    "conventions": {"type": "object"},
+    "evidence_units": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "evidence_text": {"type": "string"},
+    "example_text": {"type": "array", "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "decision"}}},
+      "then": {"properties": {"output": {"properties": {"type": {"const": "bool"}}}}}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "calculation"}}},
+      "then": {"properties": {"output": {"properties": {"type": {"enum": ["int", "date"]}}}}}
+    }
+  ],
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,60}$"},
+    "input": {
+      "type": "object",
+      "required": ["name", "type", "unit", "desc", "origin", "nullable"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "type": {"enum": ["int", "bool", "date", "list"]},
+        "unit": {"type": ["string", "null"]},
+        "desc": {"type": "string"},
+        "origin": {"enum": ["claim_fact", "assessment", "policy", "computed"]},
+        "nullable": {"type": "boolean"},
+        "exclusion": {"const": true},
+        "min": {},
+        "max": {},
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "unit", "desc"],
+            "properties": {
+              "name": {"$ref": "#/$defs/name"},
+              "type": {"enum": ["int", "bool", "date"]},
+              "unit": {"type": ["string", "null"]},
+              "desc": {"type": "string"},
+              "min": {},
+              "max": {}
+            }
+          }
+        },
+        "max_items": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"enum": ["bool", "date"]}}},
+          "then": {"properties": {"unit": {"const": null}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "list"}}},
+          "then": {"required": ["fields"]}
+        },
+        {
+          "if": {"required": ["exclusion"]},
+          "then": {"properties": {"type": {"const": "bool"}}}
+        }
+      ]
+    }
+  }
+}

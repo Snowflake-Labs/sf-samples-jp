@@ -1,0 +1,50 @@
+# 正解の隔離のための禁止名（正本）
+# src/jpcalc/ のうち eval/ 以外のすべて（予測側）は、ここに挙げたパス・ファイル名を文字列として持たず、開かない。
+# jpcalc.common.guard（AST ガード）と tests/guard/ がこの一覧を読んで検査する。新しいモジュールも既定で検査の対象。
+# 正解を扱うコード（評価モードの取得・正解の読み込み・採点）は jpcalc.eval に置く。
+
+# 予測側のコードが文字列として持ってはならないファイル名
+forbidden_names:
+  # 保険約款の正解
+  - policy.json
+  - source.json
+  - layout.json
+  - render.html
+  - tasks.jsonl
+  - tasks_H1.jsonl
+  - tasks_H2.jsonl
+  - spec.json
+  - answer_key.json
+  - cases.jsonl
+  - patch.json
+  - manifest.json
+  - _run_report.json
+  - data-card.md
+  # 契約書の正解
+  - contract.json
+  - calendar.json
+  # 正解由来の列を含む完全な索引（予測側は public_index.jsonl だけを読む）
+  - index.json
+  - documents.jsonl
+  - rules.jsonl
+
+# 予測側のコードが文字列として持ってはならないディレクトリ
+# strict_dir_names：一般的でない名前。`calc` だけの文字列（Path(root) / "calc"）でも違反にする
+strict_dir_names:
+  - calc
+  - answers
+  - views
+# boundary_dir_parts：一般的な語。`tests/` で始まるか `/tests/` を含む文字列だけを違反にする（語としての tests は通す）
+boundary_dir_parts:
+  - programs/
+  - tests/
+  - pages/
+
+# 予測モードの fetch の allow-list に入ってよいパターンの形（これ以外は例外にする）
+predict_allow:
+  yakkan: ["documents/*/*--*/doc.pdf"]
+  contract: ["inputs/*/*--*.pdf"]
+
+# 予測側から import してはならないモジュール。文字列での指定（importlib など）も違反にする
+forbidden_imports:
+  - jpcalc.eval
