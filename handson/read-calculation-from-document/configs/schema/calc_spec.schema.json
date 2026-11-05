@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "jpcalc 計算仕様 v1（宣言的な式の木）",
+  "type": "object",
+  "required": ["spec_version", "doc_id", "params", "tables", "rules"],
+  "properties": {
+    "spec_version": {"const": "jpcalc-1"},
+    "doc_id": {"type": "string"},
+    "params": {"type": "object", "additionalProperties": {
+      "type": "object", "required": ["value", "unit"],
+      "properties": {"value": {"type": ["integer", "string"]}, "unit": {"type": "string"},
+                     "const_key": {"type": ["string", "null"]}, "text": {"type": ["string", "null"]},
+                     "source": {"type": ["object", "null"]}}}},
+    "tables": {"type": "object", "additionalProperties": {
+      "type": "object", "required": ["rows", "mode"],
+      "properties": {"rows": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2}},
+                     "mode": {"enum": ["exact", "step_le", "step_ge"]},
+                     "block_id": {"type": ["string", "null"]}, "source": {"type": ["object", "null"]}}}},
+    "rules": {"type": "array", "items": {
+      "type": "object", "required": ["function", "kind", "inputs", "steps", "output"],
+      "properties": {
+        "function": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*$"},
+        "kind": {"enum": ["calculation", "decision"]},
+        "title": {"type": ["string", "null"]},
+        "inputs": {"type": "array", "items": {"type": "object", "required": ["name", "type"],
+          "properties": {"name": {"type": "string"}, "type": {"enum": ["int", "bool", "date", "list"]},
+                         "fields": {"type": "array"}}}},
+        "steps": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["name", "expr"],
+          "properties": {"name": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*$"},
+                         "label": {"type": ["string", "null"]}, "expr": {}}}},
+        "output": {"type": "string"},
+        "output_type": {"enum": ["int", "bool", "date"]},
+        "evidence_units": {"type": "array", "items": {"type": "string"}},
+        "explicit": {"type": "object"},
+        "unresolved": {"type": "array"}
+      }}}
+  }
+}

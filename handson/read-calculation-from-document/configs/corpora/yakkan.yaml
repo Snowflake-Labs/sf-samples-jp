@@ -1,0 +1,38 @@
+# 保険約款コーパスの設定
+name: yakkan
+title: 日本語保険約款（合成）
+source:
+  kind: huggingface                 # huggingface（既定）| local（開発用）
+  huggingface:
+    repo_id: cvusk/japanese-insurance-document-understanding-calculation
+    revision: f6d368a6bf84c7eb14a6fba158e8bfc504fe5366   # 40 桁のコミット SHA。main・タグ・短縮 SHA は不可
+  local:
+    path: ${DATA_ROOT_YAKKAN}       # kind: local のときだけ。configs/deploy.local.env から展開する
+license:
+  dataset: CC-BY-4.0
+  attribution: Yusuke Shibui (shibuiwilliam)
+  notices: [LICENSE, licenses-fonts/README.md]   # フォント：Noto（SIL OFL 1.1）・IPAex（IPA フォントライセンス v1.0）
+index:
+  # 完全な索引は正解由来の列（rules・cases・patterns など）を含む。fetch がメモリ上で読み、下の列だけを
+  # data/<corpus>/<rev>/public_index.jsonl に写す。完全な索引はディスク・ステージ・イメージに置かない
+  file: index.json
+  records: documents
+  columns: {doc_id: doc_id, split_group: base_content_id, stratum: genre, styles: styles, pages: pages, pdf_file: null}  # PDF のパスは paths.pdf から組み立てる
+  sha256_from: index_files          # index.json の files（パス → SHA-256）
+paths:
+  # 予測用（予測ジョブが読むのはこれだけ）
+  pdf: "documents/{doc_id}/{doc_id}--{style}/doc.pdf"
+  pdf_id: "{doc_id}--{style}"
+  # 評価用（評価ロールだけ。--eval のときだけ取得する）
+  gold:
+    - "documents/{doc_id}/calc/**"
+    - "documents/{doc_id}/policy.json"
+    - "documents/{doc_id}/{doc_id}--*/layout.json"   # 読み取りの採点
+  gold_root: "documents/{doc_id}/calc"
+  gold_tests: "documents/{doc_id}/calc/tests"
+split:
+  salt: "docalc-split-v1:"          # 固定の値（文字列に意味は無い）。変更すると分割が変わるので変えない
+  dev_fraction: 0.4                 # 層ごとに round(base 数 × 0.4) を DEV にする（Python の round）
+harness:
+  date_args: DATE_ARGS              # 日付の変換はテストファイルの DATE_ARGS
+  calendar: false

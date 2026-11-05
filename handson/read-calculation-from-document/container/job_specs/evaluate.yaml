@@ -1,0 +1,47 @@
+# 評価ジョブ（S20）の仕様のひな型。<schema_ops>.S20_EVALUATE（評価ロールの所有）が EXECUTE JOB SERVICE … USING (…) で値を埋める。
+# 評価ロールで動く。マウントするのは正解のステージと生成物のステージだけ（予測の入力ステージはマウントしない）。
+# 生成物は読むだけで、採点の作業は一時ディレクトリで行い、結果は評価 DB の表に書く。
+# コマンドをシェルで包まない（失敗を握りつぶさない）。外部アクセス統合を付けない。
+spec:
+  containers:
+  - name: main
+    image: {{ image }}
+    command:
+    - python
+    - -m
+    - jpcalc
+    - job
+    - evaluate
+    - --run-id
+    - {{ run_id }}
+    - --eval-run-id
+    - {{ eval_run_id }}
+    env:
+      JPCALC_IMAGE_TAG: {{ image_tag }}
+      JPCALC_STAGE_GOLD: /stage/gold
+      JPCALC_STAGE_RESULTS: /stage/results
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 1
+        memory: 4Gi
+    volumeMounts:
+    - name: gold
+      mountPath: /stage/gold
+    - name: results
+      mountPath: /stage/results
+  volumes:
+  - name: gold
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_gold }}
+  - name: results
+    source: stage
+    uid: 1000
+    gid: 1000
+    stageConfig:
+      name: {{ stage_results }}

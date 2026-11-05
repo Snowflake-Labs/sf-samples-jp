@@ -1,0 +1,49 @@
+# パイプラインの設定。モデルの利用可否は setup で確かめる（仮定しない）。
+llm:
+  model: claude-sonnet-5
+  temperature: 0
+  # AI_COMPLETE の max_tokens は推論のトークンも含むとみられる。課金は使った分だけなので上限は大きく取る
+  max_tokens:
+    k_cards: 64000                # 段 K。再走査と K-R も同じ上限を使う
+    d_spec: 64000
+    t_examples: 12000
+    t_crosscheck: 24000
+    r_repair: 48000
+k:
+  prompt: k_cards_p1
+  rescan: true
+  rescan_prompt: k_rescan_p1
+  repair: true                    # 点検で旗の立ったカードだけを直す（K-R）
+  repair_prompt: k_repair_p1
+repair:
+  max_iter: 3                     # 改修（R）の周回の上限
+selftest:
+  boundary_delta: [-1, 0, 1]
+  random_cases: 200
+  crosscheck_points: 4
+  crosscheck_mode: report         # report だけ。改修の引き金と最終版の選択に使わない
+sandbox:
+  timeout_sec: 120                # 自己テストの 1 回の実行（全ケース）の上限
+  per_call_timeout_sec: 5         # 生成した関数の 1 回の呼び出しの上限（超えたケースだけが時間切れ）
+run:
+  chunk_pdfs: 4                   # 予測ジョブは PDF をこの件数ずつ処理し、まとまりごとに台帳に記録する（再開の単位）
+# 対象の一覧（pdf_id）。pilot・shots は DEV から選ぶ
+slices:
+  yakkan:
+    pilot:
+      - group-0006-c2--grp-a4-1col-mincho
+      - quake-0002-c1--nl-a4-2col-gothic-plain
+      - oneday-0009-c1--nl-a4-2col-mincho
+      - travel-0003-c1--travel-a4-1col-gothic
+    shots:
+      - health-0002-c1--nl-a4-2col-mincho
+      - life-0006-c2--life-b5-1col-mincho
+  contract:
+    pilot:
+      - pur-0402--ct-a4-1col-form
+      - nda-0502--ct-a4-1col-mincho
+      - dlg-0302--ct-a4-1col-mincho
+      - emp-0102--ct-a4-1col-form
+    shots:
+      - csl-0502--ct-a4-1col-form
+      - lic-0301--ct-a4-1col-mincho
