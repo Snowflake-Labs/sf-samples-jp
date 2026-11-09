@@ -54,20 +54,11 @@ LLM に文書を渡して Python の生成だけを依頼すると、コード�
 
 ### このハンズオンのやり方
 
-AI に任せる処理と、決まった規則で毎回同じ結果を出せる処理（決定的な処理）を分けます。
-
-| 処理 | 方法 |
-|---|---|
-| PDF の読み取り（条・項・号・表・図・数値の位置） | テキスト層と罫線・図形から**規則で**内部表現（pdoc）を作る。AI を使わない |
-| 計算・判定の候補を拾う | 「差し引いた額」「日以内」「支払いません」などの手掛かりから規則で拾う |
-| 関数のインターフェース（カード）を設計する | `AI_COMPLETE` |
-| 計算の中身 | AI に Python ではなく**計算仕様（式の木）**を書かせて検証し、仕様から Python を**規則で生成**する。数値は AI に書かせず、文書の数値の位置（値スパン）を参照させる |
-| 検証 | 文書に印刷された設例と、仕様から作ったテストで**自己検証**し、失敗したら仕様を直す（最大 3 周） |
-| 採点（`--eval` のときだけ） | **隔離した正解データ**の pytest で採点し、規定の見落とし・呼び出し口の違い・計算の誤りに分けて数える |
+AI と決定的な処理を分けます。PDF の読み取り、候補検出、Python の生成は規則で行います。AI は、関数のインターフェースと計算仕様（JSON の式の木）を作ります。生成コードは、文書の設例と仕様から作ったケースで自己検証します。`--eval` を付けた場合だけ、隔離した正解データで採点します。
 
 ### 具体例：保険約款の 1 項から関数へ
 
-次は、保険約款 PDF（`group-0006-c2--grp-a4-1col-mincho`）から得た生成物の抜粋です。Python は、ここに示す計算仕様を現在のコード生成処理に渡して作成しました。AI の出力は実行ごとに変わるため、関数名や関数の分け方が異なることがあります。
+次は、保険約款 PDF（`group-0006-c2--grp-a4-1col-mincho`）から介護一時金の関数を作る流れです。AI の出力は実行ごとに変わるため、関数名や関数の分け方が異なることがあります。
 
 ```mermaid
 flowchart LR
@@ -78,68 +69,18 @@ flowchart LR
     st -->|"--eval"| ev["正解のテストで採点"]
 ```
 
-**PDF の本文（抜粋）**
-
 > ② 介護一時金の額は、介護のために支出した費用の額から5,000円を差し引いた額とします。この額が50万円を上回る場合は、50万円をもって介護一時金の額とします。算出は次の算式によります。
 > 介護のために支出した費用の額－5,000円＝介護一時金の額
 > ③ 前項の規定により算出した額が0円を下回る場合には、介護一時金を支払いません。
 
-**段 K が作ったカード（関数のインターフェース。主な欄の抜粋）**
-
-```json
-{
-  "function": "nursing_care_payout",
-  "kind": "calculation",
-  "title": "介護一時金の額",
-  "inputs": [{"name": "care_cost", "type": "int", "unit": "JPY", "desc": "介護のために支出した費用の額", "nullable": true}],
-  "output": {"type": "int", "unit": "JPY", "nullable": true},
-  "evidence_units": ["p46", "fml1", "p47"]
-}
-```
-
-`evidence_units` は根拠の本文の単位（項・算式）の ID です。`fml1` は段 A が算式として読み取った行です。
-
-**段 D が作った計算仕様（式の木。この関数の部分の抜粋）**
-
-```json
-{
-  "function": "nursing_care_payout",
-  "steps": [
-    {"name": "diff", "label": "介護のために支出した費用の額から5,000円を差し引いた額",
-     "expr": {"op": "sub", "args": [{"var": "care_cost"}, {"param": "v003"}]}},
-    {"name": "limited", "label": "50万円を上回る場合は50万円とする",
-     "expr": {"op": "min", "args": [{"step": "diff"}, {"param": "v007"}]}},
-    {"name": "nursing_care_payout", "label": "算出した額が0円を下回る場合には支払わない",
-     "expr": {"op": "max", "args": [{"lit": 0}, {"step": "limited"}]}}
-  ],
-  "output": "nursing_care_payout"
-}
-```
-
-`v003`・`v007` は値スパン（PDF に印字された「5,000円」「50万円」の位置と解釈）の ID です。AI は数値を書かず、この ID を参照します。
-
-**段 I が仕様から生成した Python**
-
 ```python
 def nursing_care_payout(*, care_cost: int | None = None) -> int | None:
-    """介護一時金の額
-
-    根拠: p46; fml1; p47
-    """
-    v_care_cost = care_cost
-    s_diff = t_sub(v_care_cost, P_V003)  # 介護のために支出した費用の額から5,000円を差し引いた額
-    s_limited = t_min(s_diff, P_V007)  # 50万円を上回る場合は50万円とする
-    s_nursing_care_payout = t_max(0, s_limited)  # 算出した額が0円を下回る場合には支払わない
-    return _norm(s_nursing_care_payout)
+    diff = t_sub(care_cost, P_V003)  # 5,000円を差し引く
+    limited = t_min(diff, P_V007)  # 50万円を上限にする
+    return _norm(t_max(0, limited))  # 0円を下限にする
 ```
 
-この例の要点は次のとおりです。
-
-- 5,000 円と 50 万円は、値スパンからモジュールの定数（`P_V003 = 5000` など）として生成されます。AI は数値そのものを書かないので、写し間違いが起きません（どの値スパンを参照するかは AI が選びます）。
-- `t_sub`・`t_min`・`t_max` は不明（`None`）を伝える演算です。`care_cost=300000` なら 295000、`800000` なら上限の 500000、`3000` なら 0、`None` なら `None` を返します。
-- Python は AI が書いたものではなく、検査済みの仕様から規則で生成したものです。同じ仕様からは同じコードになります。
-
-参考実行（§3.5）の採点（§7）では、この例の `nursing_care_payout` が正解側のルール `caregiving_payout` に対応付けられ、24 件の正解テストすべてに合格しました。
+5,000 円と 50 万円は、PDF に印字された値の位置と解釈を持つ「値スパン」から定数になります。AI は数値ではなく値スパンの ID を選びます。Python は検査済みの仕様から規則で生成するため、同じ仕様からは同じコードになります。この関数は、参考実行の正解テスト 24 件すべてに合格しました（§7）。
 
 ### 学べること
 
@@ -173,14 +114,6 @@ flowchart TB
     ej --> res[("評価 DB<br/>EVAL_RUNS・RULE_RESULTS")]
 ```
 
-予測ジョブの中の段：
-
-```mermaid
-flowchart LR
-    r["A 読み取り<br/>（決定的）"] --> j["J1 候補<br/>（決定的）"] --> k["K カード<br/>（AI）"] --> l["k_lint・K-R<br/>点検と改修"] --> d["D 計算仕様<br/>（AI）"] --> i["I Python 生成<br/>（決定的）"] --> t["T 自己テスト"]
-    t -->|"失敗"| rr["R 仕様の改修<br/>（AI・最大 3 周）"] --> i
-```
-
 このハンズオンで作成する Snowflake オブジェクトには、すべて `JA_DOC_CALC_` という接頭辞が付きます（`configs/deploy.env` の接頭辞から組み立てます）。
 
 | 種類 | 名前 | 役割 |
@@ -197,22 +130,10 @@ flowchart LR
 アカウントのパラメータ（クロスリージョン推論の設定など）は変更しません。後片付けでは、この接頭辞を持つオブジェクトだけを名前で指定して削除します。
 
 
-### 用語
-
-このハンズオンでは、用語を次のように定義します。
+### 実行前に知っておく用語
 
 | 用語 | 意味 |
 |---|---|
-| 規定 | 約款に書かれた、金額・日数・期限・支払可否などを決める決まり |
-| ルール | データセットが正解として用意した、規定 1 つ分の関数とテスト。採点の単位で、「ルールの合格」は正解のルール×PDF のうち全ケースに合格した数 |
-| 関数・カード | パイプラインが PDF から作る Python 関数と、そのインターフェース（関数名・入力・出力・根拠の本文）。カードは段 K が作る |
-| 計算仕様 | 関数の中身を表す JSON の式の木。段 D の AI が書き、検査してから段 I が Python に変換する |
-| 段 | 予測ジョブ内の処理単位。A、J1、K、`k_lint`、K-R、D、I、T、R の順に実行する。`k_lint` はインターフェースを決定的に検査し、K-R は問題が見つかったカードを AI で修正する。台帳では A と P（J1〜R）にまとめて記録する |
-| 決定的な処理・規則 | 同じ入力からは毎回同じ結果になる処理。正規表現・座標の判定・コード生成など、AI を使わない部分 |
-| pdoc | 段 A が PDF から作る内部表現（条・項・号・表・図・数値の位置を持つ JSON） |
-| 値スパン | PDF に印字された数値の位置と解釈（原文「25日」・値 25・単位 DAY）。AI には数値ではなく値スパンの ID を返させる |
-| コーパス | 文書の集まり。`yakkan`（保険約款）と `contract`（契約書）の 2 つがあり、このハンズオンの手順は `yakkan` で進める |
-| 文書・PDF | `doc_id` は内容が同じ文書を表す ID。1 文書から複数の組版 PDF が作られる場合がある。実行対象と費用は PDF 単位で数える |
 | DEV・HOLDOUT | データの分け方。DEV は開発に使ってよい側、HOLDOUT は最終確認のために取り分けた側 |
 | base | 公開索引の `split_group` が表す、分割と除外の単位。同じ内容の組版違いなど、似た文書が DEV と HOLDOUT、または手本と実行対象の両方に入らないように使う |
 | pilot | DEV から選んだ、各コーパス 4 PDF の小さな対象（`configs/pipeline.yaml` の `slices`） |
@@ -272,12 +193,7 @@ setup は `ACCOUNTADMIN` で、次の権限を付けます（`sql/setup/00_roles
 | アカウントの `EXECUTE TASK` | `JA_DOC_CALC_PREDICT` ロール | 予測ロールが Task グラフを起動する |
 | データベースロール `SNOWFLAKE.CORTEX_USER` | `JA_DOC_CALC_PREDICT` ロール | 予測ロールが `AI_COMPLETE` を呼ぶ |
 
-参考：
-
-- [Snowflake editions](https://docs.snowflake.com/en/user-guide/intro-editions)
-- [Snowpark Container Services](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview)
-- [`AI_COMPLETE`](https://docs.snowflake.com/en/sql-reference/functions/ai_complete)
-- [Task グラフ](https://docs.snowflake.com/en/user-guide/tasks-graphs)
+関連資料：[Snowflake editions](https://docs.snowflake.com/en/user-guide/intro-editions)、[Snowpark Container Services](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview)、[`AI_COMPLETE`](https://docs.snowflake.com/en/sql-reference/functions/ai_complete)、[Task グラフ](https://docs.snowflake.com/en/user-guide/tasks-graphs)
 
 ### 3.2 ローカル環境に必要なもの
 
@@ -311,15 +227,6 @@ uv sync
 scripts/start.sh --test        # lint・format・設定の検査・正解漏れのガード・単体テスト
 ```
 
-```text
-実行: uv run ruff check .
-実行: uv run ruff format --check .
-実行: uv run python -m jpcalc check-config
-実行: uv run python -m jpcalc guard
-実行: uv run pytest
-ローカル検査はすべて通った
-```
-
 最後に `ローカル検査はすべて通った` と表示されれば、準備は完了です。
 `scripts/*.sh` が出す行の先頭には、UTC の時刻（`[07:12:22Z]` など）が付きます。この README の出力の例では、時刻と一部の行を省いています。
 単体テストは合成した最小の PDF・文書を使うので、データセットの取得も Snowflake への接続もしません。
@@ -339,18 +246,9 @@ scripts/start.sh --test        # lint・format・設定の検査・正解漏れ�
 | ステップ 6（任意・§9）：pilot 4 PDF を `--eval` で | 約 42 分 | 14（§5・§8 で処理した 2 PDF はキャッシュを利用） |
 | `teardown.sh --yes` | 約 30 秒（評価記録の退避を含む） | なし |
 
-- 実測では、§5 と §7 を初回から `--eval` 付きでまとめて実行し、約 16.5 分かかりました。内訳は、予測ジョブが約 14.5 分、評価が約 1.5 分です。表の §5 は評価時間を除いた値、§7 はキャッシュ利用時の実測から見積もった値です。
-- **参考実行のクレジット（`SNOWFLAKE.ACCOUNT_USAGE` で確認。請求額ではありません）**
-  - AI：保険約款 1 PDF の初回は約 0.62、§8 の再開は約 0.54、pilot で新しく処理した 2 PDF は約 1.84 クレジットでした。必須手順（§4〜§8、§10）は約 1.2、§9 を加えると約 3.0 クレジットです。
-  - ウェアハウス：稼働中は、クラウドサービスを含めて 1 時間あたり約 1.6〜1.9 クレジットでした。必須手順では約 45 分稼働するため、約 1.2〜1.4 クレジットです。§9 を加えると、さらに約 1.2〜1.3 クレジットかかります。
-  - コンピュートプール：§9 を含めても約 0.15 クレジットでした。
-  - 合計は、必須手順で約 2.5、§9 を加えると約 5.5 クレジットです。いずれも上記の実績から求めた見積もりです。
-- ウェアハウス（XSMALL）は、start の実行中、継続して稼働します。
-  - `S10`・`S20` のプロシージャがジョブの終わりまで待ち、手元の start も 20 秒ごとに台帳を確かめるので、自動停止（60 秒）に入らないためです。
-  - このため、ウェアハウスの費用は AI とほぼ同じ額になります。
-  - ウェアハウスの世代はアカウントの既定に従います（Gen2 だと単価が高くなります。上の実績は Gen2 の値です）。
-- コンピュートプールは CPU_X64_XS・1 ノードで、使わなければ 5 分で自動停止します。
-- 実際の消費は、アカウントの使用量の画面と `ACCOUNT_USAGE` で確認してください。
+参考実行では、1 PDF の予測と評価を合わせて約 16.5 分かかりました。必須手順の合計は約 2.5 クレジット、任意の pilot まで含めると約 5.5 クレジットです。これは `ACCOUNT_USAGE` の実績から求めた目安で、請求額ではありません。
+
+start の実行中は XSMALL ウェアハウスが継続して動きます。コンピュートプールは CPU_X64_XS・1 ノードで、未使用時は 5 分で自動停止します。実際の消費量はアカウントの使用量画面で確認してください。
 
 ---
 
@@ -359,21 +257,6 @@ scripts/start.sh --test        # lint・format・設定の検査・正解漏れ�
 ```bash
 scripts/setup.sh --corpus yakkan             # 取得と検査まで行い、Snowflake のオブジェクトを作る前に止まる
 scripts/setup.sh --corpus yakkan --yes       # オブジェクトを作り、イメージを push する
-```
-
-```mermaid
-flowchart LR
-    a["前提の確認<br/>uv・Docker・snow・接続名"] --> b["公開索引と<br/>DEV/HOLDOUT の分割の確認"]
-    b --> c["pilot と手本の PDF を取得<br/>SHA-256 で照合"]
-    c -->|"不一致"| stop(["何も作らずに停止"])
-    c -->|"一致"| d["ローカル検査<br/>（start.sh --test と同じ）"]
-    d --> e["DDL<br/>ロール・DB・WH・プール<br/>ステージ・表・プロシージャ・Task"]
-    e --> f["ロール分離の検証<br/>18 件"]
-    f --> m["モデルの確認<br/>AI_COMPLETE を 1 回"]
-    m -->|"使えない"| stop2(["ビルドの前に停止"])
-    m -->|"使える"| g["イメージのビルドと push"]
-    g --> h["手本（few-shot）"]
-    h --> i(["setup が終わった"])
 ```
 
 `--yes` を付けない場合は、取得と検査だけを行い、作成予定の SQL 文の末尾 5 行を表示して終了します。全文は `uv run python -m jpcalc setup` で確認できます。
@@ -391,20 +274,7 @@ flowchart LR
    - このために、手本用と pilot の文書の**正解を手元の `eval_data/` に取得します**。pilot の正解は、手本の関数名が pilot の正解の関数名と重ならないように置き換えるためだけに使います。
    - 正解は予測の経路（入力ステージ・予測ジョブ）には渡しません（§11.3）。
 
-処理には約 2〜5 分かかります（Docker のビルドキャッシュの有無で変わります）。主な表示は次のとおりです（抜粋）。
-
-```text
-ローカル検査はすべて通った
-verify-roles: 18 件すべて期待どおり
-check-model: claude-sonnet-5 を使える
-docker build jpcalc:<タグ>（linux/amd64）
-イメージの検査が通った
-push → <repository>/jpcalc:<タグ>
-IMAGE_TAG=<タグ> を configs/deploy.local.env に書いた
-make-shots: yakkan: 2 PDF・ルール 9 件を手本にした（外した 0 件）→ …/work/shots/yakkan
-[yakkan] pilot: 4 PDF・ページ 55（索引の値）・見込み 1 PDF あたり AI 約 10 要求（キャッシュに当たれば 0）
-setup が完了した。次は README §5 の手順に従い、保険約款 1 PDF から始める（scripts/start.sh --corpus yakkan --docs group-0006-c2--grp-a4-1col-mincho --input pdf --cards auto）
-```
+処理には約 2〜5 分かかります。`verify-roles: 18 件すべて期待どおり`、`check-model: claude-sonnet-5 を使える`、`setup が完了した` と表示されれば成功です。
 
 setup を再実行しても、既存データやほかのオブジェクトは削除されません。2 回目以降は `--skip-build` や `--skip-fetch` で処理を省略できます。
 ただし、`--skip-build` を付けずに再実行すると、使用するイメージが新しいタグに変わります。以前のイメージを使った run は `--resume` できません。
@@ -421,13 +291,7 @@ setup を再実行しても、既存データやほかのオブジェクトは�
 scripts/start.sh --corpus yakkan --docs group-0006-c2--grp-a4-1col-mincho --input pdf --cards auto
 ```
 
-```text
-run: yakkan: 1 PDF（f6d368a6bf84c7eb14a6fba158e8bfc504fe5366）。AI の見込み 約 10 要求・約 1.0 クレジット（キャッシュに当たる分は課金しない）＋ SPCS のプールの稼働
-run: 予測ジョブの所要の見込み 約 14 分（初回の目安。キャッシュに当たる分は短い）
-run: 課金があります。見込みを確かめてから --yes を付けて実行する
-```
-
-見込みは上限寄りの目安で、請求額ではありません。確かめたら、課金の宣言を付けて実行します。
+対象 PDF 数、ページ数、AI リクエスト数、クレジットの見込みが表示され、処理を開始せずに終了します。見込みは請求額ではありません。内容を確認したら、課金の宣言を付けて実行します。
 
 ```bash
 scripts/start.sh --corpus yakkan --docs group-0006-c2--grp-a4-1col-mincho --input pdf --cards auto \
@@ -443,42 +307,8 @@ scripts/start.sh --corpus yakkan --docs group-0006-c2--grp-a4-1col-mincho --inpu
 
 宣言した内容は、台帳 `RUNS` の `config:declaration` に残ります。
 
-```mermaid
-flowchart LR
-    a["対象の決定<br/>PDF 数・ページ・見込みの表示"] --> b["再開と課金の宣言の確認"]
-    b --> c["PDF の取得と照合"]
-    c --> d["PDF・照合値・手本を PUT<br/>（予測の入力ステージ）"]
-    d --> e["正解を正解ステージへ<br/>（--eval のときだけ・評価ロール）"]
-    e --> f["run を台帳 RUNS に登録<br/>Task グラフを起動"]
-    f --> g["台帳 STEP_RUNS を見て<br/>終わりを待つ"]
-    g --> h(["段ごとの状態<br/>AI の要求数・再開のコマンド"])
-```
-
 対象は、`--docs id1,id2`（カンマ区切り）、`--docs-file <ファイル>`（1 行 1 PDF）、`--slice pilot` のいずれかで指定します。未知の ID や HOLDOUT の PDF を指定すると、実行前に停止します。
-
-```text
-run: 起動の前の検査が通った（宣言の理由：モデルかプロンプトの版が変わった後の初回・AI のキャッシュが空）
-fetch: 取得 0・照合済み 1・未照合 0・ページ 17
-upload: @JA_DOC_CALC_DB.JA_DOC_CALC_RAW.PDFS に PDF 1 件・手本 2 件を置いた
-run: run_id yakkan-1 を起動した
-```
-
-予測ジョブには約 15 分かかります。終了後、段ごとの状態、AI の要求数、再開用のコマンドが表示されます。
-
-```text
-run: SUCCEEDED・1 / 1 modules
-  A    group-0006-c2--grp-a4-1col-mincho             SUCCEEDED 誤り 0
-  P    group-0006-c2--grp-a4-1col-mincho             SUCCEEDED 誤り 1
-  S00  *                                             SUCCEEDED 誤り 0
-  S30  *                                             SUCCEEDED 誤り None
-run: AI 要求 11・この run_id で呼んだ累計 11（残りはキャッシュ）。再開：--resume yakkan-1
-```
-
-上の値は参考実行のものです。参考実行では初回から `--eval` を付けたため、実際の表示には評価段 `S20` の行もありました。`--eval` を付けない run には、この行は表示されません。
-
-`1 / 1 modules` は、関数モジュールを生成できた PDF 数と、対象 PDF 数を表します。`A` は読み取り、`P` は J1〜R の処理です。`S00` と `S30` は run 全体の処理で、`S30` の `誤り None` は誤りの件数を記録しないことを示します。
-
-`P` の `誤り` は、自己テストに失敗した関数の数です。この例では 1 関数が失敗しました。失敗した関数も生成物に残り、採点対象になります。
+予測ジョブには約 15 分かかります。`run: SUCCEEDED・1 / 1 modules` と表示されれば完了です。続いて段ごとの状態と AI リクエスト数が表示されます。`P` の `誤り` は、自己テストに合格しなかった関数の数です。該当する関数も生成物に残ります。
 
 **表示された `run_id` を控えてください。** 次のステップで生成物を取り出すときに使います。`--run-id` を付けなければ、run_id は「コーパス-UTC の日時」になります。
 
@@ -541,24 +371,7 @@ pdoc（読み取りの結果）は `<corpus>/<revision>/pdoc/<pdf_id>.json` で�
 
 照会例は `sql/examples/queries.sql` にあります。1〜4 は予測側、5〜6 は評価側の照会です。`<% … %>` は `configs/deploy.env` の値に、`:run_id` は §5 で控えた run_id に置き換えて実行します。
 
-次の例ではオブジェクト名を既定値で記載しています。`<run_id>` だけを置き換えてください。
-
-```sql
-USE ROLE JA_DOC_CALC_PREDICT;
-USE SECONDARY ROLES NONE;
-USE WAREHOUSE JA_DOC_CALC_WH;
-
--- 段ごとの状態
-SELECT step, doc_id, status, attempt, n_errors, LEFT(error_text, 120) AS error_text
-FROM JA_DOC_CALC_DB.JA_DOC_CALC_OPS.STEP_RUNS WHERE run_id = '<run_id>' ORDER BY step, doc_id;
-
--- 生成した関数のカード（ファイル形式 JSONL は setup が作る）
-SELECT $1:function::STRING AS function, $1:kind::STRING AS kind, $1:title::STRING AS title,
-       ARRAY_SIZE($1:inputs) AS n_inputs
-FROM @JA_DOC_CALC_DB.JA_DOC_CALC_OUTPUT.RESULTS
-  (FILE_FORMAT => 'JA_DOC_CALC_DB.JA_DOC_CALC_WORK.JSONL', PATTERN => '.*/runs/.*/cards[.]jsonl')
-WHERE METADATA$FILENAME LIKE '%/runs/<run_id>/%';
-```
+`sql/examples/queries.sql` の `<% … %>` を `configs/deploy.env` の値に、`:run_id` を §5 で控えた run_id に置き換えて実行します。1〜4 は予測側、5〜6 は評価側の照会です。
 
 ジョブはマウントしたステージに直接書くので、ステージのディレクトリ表には現れません。一覧は `LIST @JA_DOC_CALC_DB.JA_DOC_CALC_OUTPUT.RESULTS PATTERN = '.*/runs/.*'` で見ます。
 `queries.sql` の 2 には、「AI の要求とキャッシュ（この run で新しく呼んだ数・解析失敗）」の照会があります。
@@ -598,25 +411,7 @@ scripts/start.sh --corpus yakkan --docs group-0006-c2--grp-a4-1col-mincho --inpu
 
 同じ PDF の 2 回目以降は AI の応答をキャッシュから取得するため、新しい AI クレジットは発生しません。予測と評価を合わせて数分で終了します。
 
-```mermaid
-flowchart LR
-    out[("生成物<br/>@OUTPUT.RESULTS")] --> ej["評価ジョブ<br/>（評価ロール）<br/>対応付け → 正解の pytest"]
-    gold[("正解<br/>評価 DB の GOLD.FILES")] --> ej
-    ej --> rec[("EVAL_RUNS・RULE_RESULTS<br/>EVAL_JOBS")]
-    er(["JA_DOC_CALC_EVAL_ROLE"]) -->|"読める"| rec
-    pr(["JA_DOC_CALC_PREDICT"]) -.->|"読めない"| gold
-    pr -->|"S20_EVALUATE を呼ぶだけ<br/>戻り値は評価 ID と状態"| ej
-```
-
-終わると評価の要約が表示されます（評価ロールで評価 DB を読みます）。
-
-```text
-fetch-gold: yakkan: 14 ファイル → …/eval_data/yakkan/f6d368a6bf84c7eb14a6fba158e8bfc504fe5366（評価側の置き場所）
-upload-gold: @JA_DOC_CALC_EVAL_DB.JA_DOC_CALC_GOLD.FILES に 1 文書・8 ファイルを置いた（照合済み）
-evaluate: run yakkan-eval-1（eval …・image …）：ルールの合格 2/2・ケース 47/47・誤り 0・損失 {}
-```
-
-この PDF の正解のルールは 2 つで、どちらも全ケースに合格しました（値は参考実行のもの。§7.2）。
+終わると評価 ID、ルールとケースの合格数、エラー数、損失の内訳が表示されます。参考実行では、2 ルール・47 ケースすべてに合格しました（§7.2）。
 
 ### 7.1 指標の読み方
 
@@ -632,28 +427,7 @@ evaluate: run yakkan-eval-1（eval …・image …）：ルールの合格 2/2�
 生成関数と正解関数では、関数名や引数名が異なることがあります。評価側で両者を決定的に対応付け、正解側の呼び出しを生成関数へ変換するアダプタを介して採点します（「[11.4 採点](#114-採点対応付けと正解テスト)」）。
 生成側にだけある引数に、評価側が値を補うことはしません（主指標）。補った場合の合格数は、診断の値として別に記録します。
 
-ルールごとの結果は、評価ロールで `RULE_RESULTS` を引きます（`sql/examples/queries.sql` の 5・6）。
-
-```sql
-USE ROLE JA_DOC_CALC_EVAL_ROLE;
-USE SECONDARY ROLES NONE;
-USE WAREHOUSE JA_DOC_CALC_WH;
-SELECT pdf_id, function, pattern, passed, n_pass, n_cases, matched_gen, lost_stage, by_kind, selftest_passed
-FROM JA_DOC_CALC_EVAL_DB.JA_DOC_CALC_RESULTS.RULE_RESULTS WHERE run_id = 'yakkan-eval-1' ORDER BY pdf_id, function;
-```
-
-上の実行例の `RULE_RESULTS`（`function` は正解の関数名、`matched_gen` は対応した生成関数）：
-
-| function | pattern | passed | n_pass / n_cases | matched_gen | lost_stage |
-|---|---|---|---|---|---|
-| `caregiving_payout` | P02 | TRUE | 24 / 24 | `nursing_care_payout` | — |
-| `stay_payout` | P03 | TRUE | 23 / 23 | `hospitalization_allowance_payout` | — |
-
-正解の関数名（`caregiving_payout`）と生成した関数名（`nursing_care_payout`。§1 の例）は違いますが、根拠の本文と題名の近さで対応が付き、正解のテストで採点されています。
-この PDF からパイプラインは 13 の関数を作りました。パイプラインは正解に無い規定も関数にするので、生成した関数は正解のルールより多くなります。対応の付かなかった関数は採点に使わず、評価の記録に `extra_gen` として数えます。
-損失（`interface` など）が出る例は、§9 の pilot で見られます。
-
-`cards.jsonl` を開き、`matched_gen` に表示された生成関数の `title` と `evidence_text` を確認します。これにより、どの規定から作られた関数が正解のルールに対応したかが分かります。関数名は実行ごとに変わることがあります。
+ルールごとの結果は、評価ロールで `RULE_RESULTS` を確認します（`sql/examples/queries.sql` の 5・6）。`function` は正解関数、`matched_gen` は対応した生成関数です。生成関数名は実行ごとに変わる場合があります。
 
 ### 7.2 参考実行の評価の値
 
@@ -681,28 +455,7 @@ scripts/start.sh --corpus yakkan --docs $D --input pdf --cards auto --run-id fau
   --fail P:oneday-0009-c1--nl-a4-2col-mincho --declare "2 PDF・新しい PDF 1 つ分 AI 約 10 要求・約 0.5 クレジット" --yes
 ```
 
-```mermaid
-flowchart LR
-    subgraph first["1 回目（--fail P:oneday-0009-c1）"]
-        a1["group-0006-c2<br/>A ✓ P ✓"] --> a3(["FAILED<br/>再開のコマンドを表示"])
-        a2["oneday-0009-c1<br/>A ✓ P ✗（故障注入）"] --> a3
-    end
-    subgraph second["2 回目（--resume fault-1）"]
-        b1["group-0006-c2<br/>成功済みで飛ばす"] --> b3(["SUCCEEDED"])
-        b2["oneday-0009-c1<br/>段 P をやり直す"] --> b3
-        cache[("AI のキャッシュ")] -.->|"当たる分は呼ばない"| b2
-    end
-    a3 --> second
-```
-
-1 回目は `FAILED` で終わり、失敗した PDF と理由、再開のコマンドが表示されます。終了コードは 1 です。
-
-```text
-run: FAILED・1 件の失敗（TASK_HISTORY も参照）。同じ run_id で再開できる
-  P    oneday-0009-c1--nl-a4-2col-mincho             FAILED    誤り 1
-       故障注入（P）
-失敗した。原因を直して scripts/start.sh ... --resume fault-1 --yes で再開する（成功済みの PDF は飛ばす）
-```
+1 回目は `FAILED` で終わり、失敗した PDF、理由、再開コマンドを表示します。終了コードは 1 です。
 
 失敗した PDF だけをやり直します。
 
@@ -713,16 +466,7 @@ scripts/start.sh --corpus yakkan --docs $D --input pdf --cards auto --resume fau
 `--resume` では、成功済みの PDF を飛ばし、失敗した PDF の段 P だけを再実行して `SUCCEEDED` になります。
 `group-0006-c2` は §5・§7 で処理済みのため、AI の応答をキャッシュから取得します。`oneday-0009-c1` はここで初めて処理するため、`--resume` で約 8〜10 件の AI 要求が新しく発生し、10〜15 分かかります。
 
-**確認してみましょう：** `STEP_RUNS` を見ると、`oneday-0009-c1` の段 P は、1 回目の失敗と再開の分だけ `attempt` が増えています。`S00` などの run 全体の段は、起動のたびに記録が更新されます。
-
-```sql
-USE ROLE JA_DOC_CALC_PREDICT;
-USE SECONDARY ROLES NONE;
-USE WAREHOUSE JA_DOC_CALC_WH;
-SELECT step, doc_id, status, attempt, LEFT(error_text, 80) AS error_text
-FROM JA_DOC_CALC_DB.JA_DOC_CALC_OPS.STEP_RUNS
-WHERE run_id = 'fault-1' ORDER BY step, doc_id;
-```
+`STEP_RUNS` では、再実行した段 P の `attempt` が増えます。成功済みの PDF は再処理しません。
 
 ### 8.2 段を指定してやり直す（--from）
 
@@ -762,27 +506,7 @@ run: AI 要求 33・この run_id で呼んだ累計 14（残りはキャッシ�
 evaluate: run pilot-yakkan-1（eval …・image …）：ルールの合格 7/12・ケース 251/279・誤り 0・損失 {"interface":3,"interface_extra_args":2}
 ```
 
-参考実行の `RULE_RESULTS`（§7 と同じ照会を、この run_id で実行します）：
-
-| pdf_id | function | passed | n_pass / n_cases | matched_gen | lost_stage |
-|---|---|---|---|---|---|
-| group-0006-c2 | `caregiving_payout` | TRUE | 24 / 24 | `nursing_care_payout` | — |
-| group-0006-c2 | `stay_payout` | TRUE | 23 / 23 | `hospitalization_allowance_payout` | — |
-| oneday-0009-c1 | `carry_payout` | TRUE | 17 / 17 | `towing_cost_payout` | — |
-| oneday-0009-c1 | `incidental_payout` | TRUE | 24 / 24 | `incidental_expense_payout` | — |
-| oneday-0009-c1 | `cargo_eligible` | FALSE | 5 / 8 | `cargo_payout_eligible` | `interface` |
-| quake-0002-c1 | `lodging_eligible` | FALSE | 22 / 25 | `temp_housing_benefit_eligible` | `interface` |
-| quake-0002-c1 | `lodging_payout` | FALSE | 20 / 28 | `temp_housing_benefit_payout` | `interface_extra_args` |
-| quake-0002-c1 | `removal_payout` | TRUE | 28 / 28 | `debris_removal_benefit_payout` | — |
-| quake-0002-c1 | `proration_payout` | TRUE | 24 / 24 | `proportional_payout` | — |
-| travel-0003-c1 | `transitdelay_payout` | TRUE | 23 / 23 | `travel_delay_cost_payout` | — |
-| travel-0003-c1 | `cure_eligible` | FALSE | 21 / 26 | `treatment_cost_eligible` | `interface` |
-| travel-0003-c1 | `cure_payout` | FALSE | 20 / 29 | `treatment_cost_payout` | `interface_extra_args` |
-
-この run で不合格だった 5 ルールは、すべてインターフェースの違い（`interface`・`interface_extra_args`）によるものでした。計算の誤り（`calculation`）と規定の見落とし（`not_found`）はありませんでした。
-そのうち 3 つ（`lodging_eligible`・`cure_eligible`・`cure_payout`）は、図の「7日以上か」の分岐を、正解は日数の整数で受け取るのに、生成側は真偽の引数（`cleanup_7days_or_more` など）にしたものです。
-
-`lost_stage` が `interface_extra_args` の行について、`cards.jsonl` にある生成関数の `inputs` を確認します。正解テストが渡さない引数を特定してください。
+参考実行は、ルール 7/12、ケース 251/279 でした。不合格の 5 ルールは、すべてインターフェースの違い（`interface`・`interface_extra_args`）です。詳細は `sql/examples/queries.sql` で `RULE_RESULTS` を確認してください。
 
 ---
 
@@ -793,28 +517,9 @@ scripts/teardown.sh          # 消す文を表示するだけ
 scripts/teardown.sh --yes    # 評価記録を退避してから消す
 ```
 
-```mermaid
-flowchart LR
-    a["削除の文の一覧<br/>（接頭辞の名前だけ）"] --> b{"--yes"}
-    b -->|"無し"| show(["表示だけで終わる"])
-    b -->|"有り"| c["評価記録を<br/>results/ に退避"]
-    c --> d{"行数の照合"}
-    d -->|"不一致"| stop(["何も消さずに停止"])
-    d -->|"一致"| e["Task を止める<br/>プールのサービスを止める"]
-    e --> f["DROP：DB 2 つ・プール<br/>ウェアハウス・ロール"]
-    f --> g(["残存 0 を確認"])
-```
-
 1. 評価記録（`EVAL_RUNS`・`RULE_RESULTS`・`EVAL_JOBS`）を `results/<run_id>__<eval_run_id>/` に JSON Lines で退避し、表とファイルの行数を照合します。**照合できなければ、専用オブジェクトを削除せずに停止します**
 2. Task を止め、コンピュートプールのサービスを止め、`configs/deploy.env` の名前から組み立てた DB・プール・ウェアハウス・ロールだけを `DROP` します（`SHOW` の結果やワイルドカードからは消しません）
 3. 専用オブジェクトが残っていないことを名前で確かめます
-
-評価した run ごとに 1 行表示されます（次は §7 の 1 PDF の run の例）。
-
-```text
-export-results: … （行数の照合 OK: {'EVAL_RUNS': 1, 'RULE_RESULTS': 2, 'EVAL_JOBS': 1}）
-teardown: 専用オブジェクトを消した。残存 0
-```
 
 `--keep-eval` を指定すると、評価結果を後から SQL で確認できるように、評価 DB、評価ロール、管理ロール、ウェアハウスを残します。保管中は費用が発生します。`--no-export` を指定すると、評価記録を退避しません。
 
@@ -906,65 +611,24 @@ AI の要求はすべて `AI_REQUESTS` 表に記録します。プロシージ�
 
 このハンズオンの手順は保険約款（`yakkan`）で進めますが、パイプラインは契約書（`contract`）のコーパスにも同じコードで対応しています（`--corpus contract`）。コーパスの違い（取得元・ファイルの配置・正解のテストの呼び方）は、コードではなく設定で切り替えます。
 
-```mermaid
-flowchart LR
-    opt["--corpus yakkan"] --> cfg["configs/corpora/yakkan.yaml"]
-    cfg --> k1["source.huggingface<br/>約款のデータセットと固定 revision"]
-    cfg --> k2["paths<br/>PDF と正解のファイルの配置"]
-    cfg --> k3["harness<br/>正解のテストの日付の渡し方<br/>祝日の暦（約款は使わない）"]
-    opt --> k4["configs/pipeline.yaml の<br/>slices.yakkan（pilot・手本）"]
-    k1 & k2 & k3 & k4 --> pipe(["同じパイプライン<br/>S00〜S30"])
-```
-
-### 11.8 実装の場所
-
-| 処理 | 実装 |
-|---|---|
-| コマンドの入口・setup・ロール分離の検証・アップロード・run の制御・teardown | `src/jpcalc/cli.py`・`src/jpcalc/ops.py`・`scripts/` |
-| 取得と照合・公開索引・DEV/HOLDOUT の分割 | `src/jpcalc/fetch/` |
-| 段 A（pdoc） | `src/jpcalc/pdfread/`（`pdoc.py`・`geometry.py`・`furniture.py`・`contract_scheme.py`） |
-| 予測ジョブの入口と段の順序 | `src/jpcalc/jobs.py`・`src/jpcalc/predict/pipeline.py` |
-| 段 J1・K・k_lint・D・I・T・R | `src/jpcalc/predict/`（`j_detect.py`・`k_cards.py`・`k_lint.py`・`d_spec.py`・`codegen.py`・`t_selftest.py`・`t_examples.py`・`casegen.py`・`r_repair.py`） |
-| AI の要求とキャッシュ | `src/jpcalc/predict/llm.py`・`sql/procedures/ai_call.sql` |
-| 三値論理・数値の解釈・隔離実行・正解漏れのガード | `src/jpcalc/common/`（`tri.py`・`numparse.py`・`sandbox.py`・`guard.py`）・`configs/guard.yaml` |
-| 評価（対応付け・採点・評価ジョブ） | `src/jpcalc/eval/`（`match.py`・`score.py`・`job.py`）・`sql/procedures/evaluate.sql` |
-| S00・S10・S30・完了の記録 | `sql/procedures/steps.sql` |
-| Task グラフ | `sql/tasks/dag.sql` |
-| DDL・権限・ロール分離の検証 | `sql/setup/`・`sql/verify/roles.sql` |
-| ジョブのイメージと仕様 | `container/` |
-
-各スクリプトは `--help`、`jpcalc` は `uv run python -m jpcalc <サブコマンド> --help` で、すべてのオプションを確かめられます。
-
 ---
 
 ## 12. エッジケースの対応
 
 約款や契約書で読み取りや生成が崩れやすい箇所と、その対処をまとめます。根拠が十分でない場合は無理に埋めず、処理できなかった内容を記録に残す方針です。
 
-### 12.1 読み取り
-
-| 課題 | 解決・回避した工夫 |
+| 課題 | 対処 |
 |---|---|
-| 2 段組で文が混ざる・柱やページ番号が本文に紛れる | 文字の座標から段組を判定し、各ページに繰り返し出る行を柱として外す |
-| 条番号の書き方が文書によって違う（`第１条`・`第一条`・見出しだけ） | 契約書の体裁を判定して、条の組み立て方を切り替える |
-| 数値の表記がばらばら（`25日`・`２５日`・`1万円`・`3割`） | 決定的なパーサで解釈して値スパンにし、原文と解釈と単位を残す。漢数字の表記（`二十五日`）は値スパンにせず件数を記録し、日付は逐語で残す |
-| AI が数値を写し間違える | AI には値スパンの ID だけを返させ、数値そのものを書かせない。式に直接書いた整数のうち構造上の数（0・1・100）でないものは警告として記録する |
-| 設例の囲みの数値を規定と取り違える | 設例だけの単位は候補から除き、設例は自己テストのケースとして使う |
-| 表・図を読めない・読み誤る | 警告を `read_errors` などに記録し、空や推測の値で埋めない |
-
-### 12.2 生成・検証・採点
-
-| 課題 | 解決・回避した工夫 |
-|---|---|
+| 2 段組、柱、ページ番号で本文が混ざる | 文字座標から段組を判定し、繰り返し行を本文から外す |
+| 条番号や数値の表記がそろわない | 文書の体裁ごとに条を組み立て、算用数字は原文・値・単位を持つ値スパンにする。漢数字と日付は推測せず原文を残す |
+| AI が数値を転記し間違える | AI には値スパン ID を返させる。根拠にない整数は警告として記録する |
+| 設例、表、図を規定と取り違える | 設例は自己テストに回し、読めない表・図は `read_errors` に残して推測で埋めない |
 | 境界（「以上」と「超える」）を取り違える | 仕様の中で比べられる定数の前後（`-1・0・+1`）を自己テストの境界のケースにする |
 | 入力が不明なときの扱いがばらばら | 真偽は三値、算術は不明を伝える共通部品を使う。除外事由は「渡されなければ該当しない」に統一する |
-| 祝日をプログラムに書き込む | 営業日を扱う関数は `holidays` を入力として受け取る |
-| AI の応答が JSON として解析できない | 1 回だけ呼び直し、失敗した行はキャッシュとして扱わない |
-| 改修しても自己テストが全部は通らない | 最大 3 周で打ち切り、失敗が最も少ない周回を最終版にする |
-| 生成したコードが危険な処理をする | 仕様中の文字列はコメントと docstring にだけ埋め込む。生成コードは、許可した import・属性・構文だけを認める静的検査に通す。その後、ソケットを無効化し、実行時間を制限した別プロセスで動かす（完全な隔離ではない。§15）。評価では計算仕様から再生成したコードを採点する |
-| 生成した関数名・引数名が正解と違う | 評価側だけで決定的な対応付けを作り、アダプタを通して正解のテストで呼ぶ |
-| 途中の失敗で AI が再実行される | 失敗した PDF だけを再開し、AI の結果はキャッシュから取得する |
-| 壊れた・想定と違うデータを読む | 固定 revision と SHA-256 で照合し、合わなければ何も作らずに止まる |
+| AI の応答・自己テストが失敗する | JSON 解析失敗は 1 回だけ再試行する。改修は最大 3 周で止め、失敗が最少の周回を残す |
+| 生成コードが危険な処理をする | 静的検査後、ソケットを無効化し、時間を制限した別プロセスで実行する。完全な隔離ではない（§15） |
+| 生成関数の名前・引数が正解と違う | 評価側で決定的に対応付け、アダプタを介して正解テストから呼ぶ |
+| 壊れたデータを読む、再開で再課金する | 固定 revision と SHA-256 を照合し、失敗した PDF だけをキャッシュ付きで再開する |
 
 ---
 
@@ -1004,21 +668,7 @@ flowchart LR
 - **キャッシュを使わない**：`--no-cache` を指定します。キャッシュキーに run_id を加えるため、同じ run の再開ではキャッシュを利用できます。
 - **手元だけで採点する**：まず生成物ステージから、run 全体を `out/<corpus>/<revision>/runs/<run_id>/` へ GET します。続いて `uv run python -m jpcalc evaluate --corpus <name> --run-id <run_id>` を実行します。setup または `--eval` 付き start で取得済みの正解を使うため、AI の課金は発生しません。
 
-### 13.3 台帳と評価の表
-
-| 表 | 側 | 主な列 |
-|---|---|---|
-| `JA_DOC_CALC_OPS.RUNS` | 予測 | `run_id`・`corpus`・`docs`・`config`（revision・宣言・モデル・プロンプトの版・評価の有無）・`image_tag`・`status` |
-| `JA_DOC_CALC_OPS.STEP_RUNS` | 予測 | `run_id`・`step`（S00・A・P・S20・S30）・`doc_id`・`status`・`attempt`・`n_errors`・`error_text`・`detail` |
-| `JA_DOC_CALC_OPS.JOBS` | 予測 | ジョブ名・状態・時刻・ログの末尾 |
-| `JA_DOC_CALC_WORK.AI_REQUESTS`・`AI_CACHE` | 予測 | 要求（段・モデル・プロンプトの版・キャッシュキー）・応答・誤りの種類 |
-| `JA_DOC_CALC_RESULTS.EVAL_RUNS` | 評価 | `eval_run_id`・`run_id`・ルールとケースの合格数・`summary`（発見の再現率・適合率・損失の内訳・パターン別などの内訳・診断） |
-| `JA_DOC_CALC_RESULTS.RULE_RESULTS` | 評価 | ルール×PDF の合否・ケース数・対応した生成関数・損失の段・ケースの種類別の合否 |
-| `JA_DOC_CALC_RESULTS.EVAL_JOBS` | 評価 | 評価ジョブの名前・状態・ログ |
-
-評価 DB の表は評価ロールでだけ読めます。
-
-### 13.4 開発者向け
+### 13.3 開発者向け
 
 ```bash
 uv run ruff check . && uv run ruff format --check .   # lint と format
@@ -1036,6 +686,8 @@ container/  ジョブのイメージと SPCS のジョブ仕様
 src/jpcalc/ fetch（取得と照合）・pdfread（読み取り）・predict（J1〜R）・eval（採点）・common（共通部品）・jobs・ops・cli
 tests/      unit・guard・fixtures（合成データ）
 ```
+
+各スクリプトは `--help`、`jpcalc` は `uv run python -m jpcalc <サブコマンド> --help` でオプションを確認できます。
 
 ---
 
@@ -1057,8 +709,6 @@ tests/      unit・guard・fixtures（合成データ）
 | `snow sql --role …` で権限が無いと言われる | 認証情報に残ったロールで実行されることがある。SQL の先頭で `USE ROLE …;` を実行する |
 | `GET` が構文エラーになる | ステージのパスを引用符で囲む（PDF の ID の `--` が SQL のコメントと読まれる） |
 | teardown が退避で止まった | 評価記録の行数が合わない。原因を確かめるか、退避が要らなければ `--no-export` |
-
-スクリプトのメッセージは端末に表示されます。Snowflake 側では、段ごとの状態と失敗理由を `JA_DOC_CALC_DB.JA_DOC_CALC_OPS.STEP_RUNS`、ジョブログの末尾を `JOBS` で確認できます。評価ジョブのログは、評価 DB の `EVAL_JOBS` にあります。start が失敗した場合は、端末に理由と再開用のコマンドも表示されます。
 
 ---
 

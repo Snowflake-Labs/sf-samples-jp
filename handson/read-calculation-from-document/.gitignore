@@ -58,3 +58,5 @@ build/
 
 # ---- 設定の JSON Schema は公開する（予測と採点の契約。上位の *.json の除外を打ち消す）
 !configs/schema/*.json
+
+blog/
