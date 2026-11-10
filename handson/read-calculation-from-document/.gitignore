@@ -1,0 +1,62 @@
+# このハンズオンで公開するのは、README.md・コード・設定・SQL・スクリプト・テストだけ。
+# 次のものはリポジトリに入れない。
+
+# ---- 開発用の文書（作業台帳・作業規約・レビュー・設計と判断の記録）
+AGENTS.md
+TASK.md
+REVIEW.md
+IMPROVEMENT_PROPOSAL.md
+docs/
+blog/
+
+# ---- データセット（実行時に Hugging Face から取得する。取得したものは一切コミットしない）
+data/
+eval_data/
+*.pdf
+*.png
+!imgs/*.png
+
+# ---- 出力・作業物・ログ・退避した評価記録・手元に取り出した生成物
+out/
+work/
+logs/
+results/
+tmp_out/
+
+# ---- ローカル設定（接続名・データの場所・イメージのタグ）
+configs/deploy.local.env
+.env
+
+# ---- データセットの正解から作るもの（few-shot の手本の期待値）
+configs/shots/
+
+# ---- 自動最適化の検証の拡張（評価側の開発用。公開しない）
+src/jpcalc_opt/
+configs/opt/
+configs/opt_*.yaml
+configs/prompts/k_cards_contract_p2.txt
+configs/prompts/k_cards_contract_p3.txt
+tests/unit/test_opt*.py
+
+# ---- 開発のときだけ使う補助（ハンズオンの手順では使わない）
+scripts/make_split.py
+scripts/export_results.py
+tests/integration/
+
+# ---- build_push.sh が uv.lock から生成する
+container/requirements.lock
+
+# ---- Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# ---- 設定の JSON Schema は公開する（予測と採点の契約。上位の *.json の除外を打ち消す）
+!configs/schema/*.json
+
+blog/

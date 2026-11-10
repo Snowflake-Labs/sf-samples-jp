@@ -1,0 +1,121 @@
+# DEV/HOLDOUT の分割（`jpcalc split` が公開索引から生成する。手で編集しない）。
+# 同じ base の文書・体裁はすべて同じ側に入る。sha256 は base 一覧（昇順・改行区切り）の照合値。
+yakkan:
+  revision: f6d368a6bf84c7eb14a6fba158e8bfc504fe5366
+  salt: 'docalc-split-v1:'
+  dev_fraction: 0.4
+  dev:
+    n_bases: 27
+    n_docs: 41
+    n_pdfs: 114
+    sha256: aaf18140805d1db7f04f1cca47a57fd94e5e0347e7525c7a557959ad966224d0
+    bases:
+    - auto-0001
+    - auto-0002
+    - auto-0004
+    - golf-0003
+    - golf-0005
+    - golf-0008
+    - golf-0010
+    - group-0005
+    - group-0006
+    - group-0010
+    - health-0002
+    - health-0004
+    - health-0008
+    - life-0004
+    - life-0006
+    - life-0008
+    - oneday-0008
+    - oneday-0009
+    - oneday-0010
+    - quake-0001
+    - quake-0002
+    - quake-0004
+    - quake-0008
+    - travel-0002
+    - travel-0003
+    - travel-0005
+    - travel-0009
+  holdout:
+    n_bases: 40
+    n_docs: 59
+    n_pdfs: 166
+    sha256: eb08f4b2ed853cb9b8f9924413106f1e9c2b7769538862fda90be445bf369e9b
+    bases:
+    - auto-0005
+    - auto-0006
+    - auto-0007
+    - auto-0008
+    - auto-0009
+    - golf-0001
+    - golf-0002
+    - golf-0004
+    - golf-0006
+    - golf-0007
+    - group-0001
+    - group-0002
+    - group-0003
+    - group-0004
+    - group-0008
+    - health-0001
+    - health-0003
+    - health-0005
+    - health-0006
+    - health-0007
+    - life-0002
+    - life-0005
+    - life-0007
+    - life-0009
+    - oneday-0004
+    - oneday-0005
+    - oneday-0006
+    - oneday-0007
+    - quake-0003
+    - quake-0005
+    - quake-0006
+    - quake-0007
+    - quake-0009
+    - quake-0010
+    - travel-0001
+    - travel-0004
+    - travel-0006
+    - travel-0007
+    - travel-0008
+    - travel-0010
+contract:
+  revision: 6630dbb56387fb502df8386238eb2c09ed17002a
+  salt: 'jpcalc-contract-split-v1:'
+  dev_fraction: 0.4
+  dev:
+    n_bases: 10
+    n_docs: 50
+    n_pdfs: 50
+    sha256: 1a6619f6f1f0b83b7fdf575a7ca6ca24a612ff95bb2971c7e5fa6b50a5b05eff
+    bases:
+    - con-0001
+    - csl-0002
+    - dlg-0002
+    - emp-0002
+    - lea-0002
+    - lic-0001
+    - nda-0002
+    - ots-0001
+    - pur-0002
+    - sys-0001
+  holdout:
+    n_bases: 10
+    n_docs: 50
+    n_pdfs: 50
+    sha256: b53d9d86ed04c781eea5e5d3e149c07179ac0de2f4937d4fd2b3bd3929aff70a
+    bases:
+    - con-0002
+    - csl-0001
+    - dlg-0001
+    - emp-0001
+    - lea-0001
+    - lic-0002
+    - nda-0001
+    - ots-0002
+    - pur-0001
+    - sys-0002

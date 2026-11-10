@@ -1,0 +1,17 @@
+# イメージに入れないもの（データ・正解・生成物・ローカル設定・開発用の文書）
+**
+!pyproject.toml
+!README.md
+!src/**
+!configs/**
+!sql/**
+!container/requirements.lock
+configs/deploy.local.env
+configs/shots/
+# 公開しない開発用の設定（自動最適化の検証。.gitignore の対象と同じ）
+configs/opt/
+configs/opt_*.yaml
+configs/prompts/k_cards_contract_p2.txt
+configs/prompts/k_cards_contract_p3.txt
+**/__pycache__
+src/jpcalc_opt/
